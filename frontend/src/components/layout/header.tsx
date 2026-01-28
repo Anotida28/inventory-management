@@ -13,10 +13,12 @@ import {
 } from "components/ui/dropdown-menu";
 import { User, LogOut } from "lucide-react";
 import { getAdminUser } from "lib/admin-context";
+import { useSystemCopy } from "lib/system-mode";
 
 export function Header() {
   const navigate = useNavigate();
   const admin = getAdminUser();
+  const copy = useSystemCopy();
 
   const handleLogout = () => {
     navigate("/login");
@@ -26,7 +28,7 @@ export function Header() {
     <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-border bg-card px-6 shadow-sm dark:shadow-[0_0_0_1px_rgba(255,255,255,0.04)]">
       <div className="flex items-center gap-4">
         <h1 className="text-lg font-semibold text-foreground">
-          OmaCard Stock Tracking
+          OmaCard - {copy.systemName}
         </h1>
       </div>
       <div className="flex items-center gap-4">

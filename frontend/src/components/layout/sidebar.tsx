@@ -6,15 +6,13 @@ import {
   LayoutDashboard,
   Package,
   PackageCheck,
-  CreditCard,
   FileText,
   BarChart3,
-  Users,
-  TrendingUp,
-  Wallet,
 } from "lucide-react";
 import { cn } from "lib/utils";
 import { getAdminUser } from "lib/admin-context";
+import { Tabs, TabsList, TabsTrigger } from "components/ui/tabs";
+import { useSystemCopy, useSystemMode, type SystemMode } from "lib/system-mode";
 
 type UserRole = "ADMIN" | "CLERK" | "AUDITOR" | "FINANCE";
 
@@ -25,19 +23,40 @@ type NavItem = {
   roles?: UserRole[];
 };
 
-const navigation: NavItem[] = [
-  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { name: "Receive Cards", href: "/inventory/receive", icon: Package, roles: ["ADMIN", "CLERK", "AUDITOR", "FINANCE"] },
-  { name: "Issue Cards", href: "/inventory/issue", icon: PackageCheck, roles: ["ADMIN", "CLERK", "AUDITOR", "FINANCE"] },
-  { name: "Transactions", href: "/transactions", icon: FileText, roles: ["ADMIN", "CLERK", "AUDITOR", "FINANCE"] },
-  { name: "Reports", href: "/reports", icon: BarChart3, roles: ["ADMIN", "CLERK", "AUDITOR", "FINANCE"] },
-  // { name: "Finance Desk", href: "/finance", icon: Wallet, roles: ["FINANCE", "ADMIN"] },
-  // Adjustments nav item fully removed
-];
-
 export function Sidebar() {
   const { pathname } = useLocation();
   const userRole = getAdminUser().role as UserRole;
+  const { mode, setMode } = useSystemMode();
+  const copy = useSystemCopy();
+
+  const navigation: NavItem[] = [
+    { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+    {
+      name: copy.receiveNavLabel,
+      href: "/inventory/receive",
+      icon: Package,
+      roles: ["ADMIN", "CLERK", "AUDITOR", "FINANCE"],
+    },
+    {
+      name: copy.issueNavLabel,
+      href: "/inventory/issue",
+      icon: PackageCheck,
+      roles: ["ADMIN", "CLERK", "AUDITOR", "FINANCE"],
+    },
+    {
+      name: "Transactions",
+      href: "/transactions",
+      icon: FileText,
+      roles: ["ADMIN", "CLERK", "AUDITOR", "FINANCE"],
+    },
+    {
+      name: "Reports",
+      href: "/reports",
+      icon: BarChart3,
+      roles: ["ADMIN", "CLERK", "AUDITOR", "FINANCE"],
+    },
+    // Adjustments nav item fully removed
+  ];
   
   // All users can access all navigation items
   const filteredNavigation = navigation;
@@ -52,6 +71,21 @@ export function Sidebar() {
           height={40}
           className="object-contain"
         />
+      </div>
+      <div className="border-b border-border px-4 py-4">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Mode
+        </p>
+        <Tabs
+          value={mode}
+          onValueChange={(value) => setMode(value as SystemMode)}
+          className="mt-3"
+        >
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="CARDS">Cards</TabsTrigger>
+            <TabsTrigger value="INVENTORY">Inventory</TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
       <nav className="flex-1 space-y-1 px-3 py-4">
         {filteredNavigation.map((item) => {

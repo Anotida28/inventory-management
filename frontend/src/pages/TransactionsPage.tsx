@@ -13,6 +13,7 @@ import {
 } from "modules/transactions/lib/filters";
 import { apiRequest } from "services/api";
 import { useToast } from "components/ui/toast-provider";
+import { useSystemCopy } from "lib/system-mode";
 
 const numberFormatter = new Intl.NumberFormat(undefined, {
   minimumFractionDigits: 2,
@@ -34,6 +35,7 @@ export default function TransactionsPage() {
   const ALL_CARD_OPTION = "ALL_CARD_TYPES";
   
   const { toast } = useToast();
+  const copy = useSystemCopy();
   const queryClient = useQueryClient();
   const [selectedTransaction, setSelectedTransaction] = useState<any>(null);
   const [valueForm, setValueForm] = useState(createEmptyFinancialForm);
@@ -204,7 +206,7 @@ export default function TransactionsPage() {
   ];
 
   const cardTypeOptions = [
-    { value: ALL_CARD_OPTION, label: "All Card Types" },
+    { value: ALL_CARD_OPTION, label: copy.itemTypeAllLabel },
     ...(cardTypes ?? []).map((type) => ({
       value: type.id.toString(),
       label: type.name,
@@ -229,7 +231,7 @@ export default function TransactionsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Transactions"
-        description="View and manage all inventory transactions"
+        description={copy.transactionsDescription}
       />
 
       <TransactionFiltersPanel

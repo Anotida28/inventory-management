@@ -13,6 +13,7 @@ import {
 } from "components/ui/table";
 import { format } from "date-fns";
 import { Eye, FileText } from "lucide-react";
+import { useSystemCopy } from "lib/system-mode";
 
 type PaginationFilters = {
   page: number;
@@ -38,6 +39,7 @@ export default function TransactionHistoryTable({
   getTypeBadgeVariant,
   getTransactionValueDisplay,
 }: TransactionHistoryTableProps) {
+  const copy = useSystemCopy();
   return (
     <Card>
       <CardHeader>
@@ -49,7 +51,7 @@ export default function TransactionHistoryTable({
             <TableRow>
               <TableHead>ID</TableHead>
               <TableHead>Type</TableHead>
-              <TableHead>Card Type</TableHead>
+              <TableHead>{copy.itemTypeLabel}</TableHead>
               <TableHead>Quantity</TableHead>
               <TableHead>Recipient</TableHead>
               <TableHead>Date</TableHead>

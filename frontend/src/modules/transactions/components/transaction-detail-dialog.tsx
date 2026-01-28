@@ -14,6 +14,7 @@ import { Label } from "components/ui/label";
 import { format } from "date-fns";
 import { Download, FileText } from "lucide-react";
 import type { Dispatch, SetStateAction } from "react";
+import { useSystemCopy } from "lib/system-mode";
 
 type ValueForm = {
   unitCost: string;
@@ -48,6 +49,7 @@ export default function TransactionDetailDialog({
   formatAmount,
   getTypeBadgeVariant,
 }: TransactionDetailDialogProps) {
+  const copy = useSystemCopy();
   return (
     <Dialog
       open={!!selectedTransaction}
@@ -80,7 +82,9 @@ export default function TransactionDetailDialog({
                 </div>
               </div>
               <div>
-                <Label className="text-xs text-muted-foreground">Card Type</Label>
+                <Label className="text-xs text-muted-foreground">
+                  {copy.itemTypeLabel}
+                </Label>
                 <p className="font-medium">
                   {selectedTransaction.cardType.name}
                 </p>
@@ -171,8 +175,8 @@ export default function TransactionDetailDialog({
                     <h4 className="text-sm font-semibold">Financials</h4>
                     <p className="text-xs text-muted-foreground">
                       {selectedTransaction.type === "RECEIVE"
-                        ? "Capture the per-card cost and total receipt value."
-                        : "Capture the per-card price and total issuance value."}
+                        ? `Capture the per-${copy.unitNoun} cost and total receipt value.`
+                        : `Capture the per-${copy.unitNoun} price and total issuance value.`}
                     </p>
                   </div>
                   {canEditFinancials && (

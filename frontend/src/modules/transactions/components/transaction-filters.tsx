@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from "components/ui/select";
 import type { TransactionFilters } from "modules/transactions/lib/filters";
+import { useSystemCopy } from "lib/system-mode";
 
 type FilterOption = {
   value: string;
@@ -37,6 +38,7 @@ export default function TransactionFiltersPanel({
   allTypeValue,
   allCardTypeValue,
 }: TransactionFiltersProps) {
+  const copy = useSystemCopy();
   const updateFilters = (patch: Partial<TransactionFilters>) => {
     onChange({ ...filters, ...patch, page: 1 });
   };
@@ -80,13 +82,13 @@ export default function TransactionFiltersPanel({
           </div>
 
           <div className="space-y-2">
-            <Label>Card Type</Label>
+            <Label>{copy.itemTypeLabel}</Label>
             <Select
               value={filters.cardTypeId || allCardTypeValue}
               onValueChange={handleCardTypeChange}
             >
               <SelectTrigger>
-                <SelectValue placeholder="All card types" />
+                <SelectValue placeholder={copy.itemTypeAllLabel} />
               </SelectTrigger>
               <SelectContent>
                 {cardTypeOptions.map((option) => (

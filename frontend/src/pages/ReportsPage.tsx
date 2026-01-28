@@ -26,6 +26,7 @@ import { Badge } from "components/ui/badge";
 import { Download } from "lucide-react";
 import { apiRequest } from "services/api";
 import { format } from "date-fns";
+import { useSystemCopy } from "lib/system-mode";
 
 export default function ReportsPage() {
   const [dateRange, setDateRange] = useState({
@@ -34,6 +35,7 @@ export default function ReportsPage() {
   });
   const [cardTypeFilter, setCardTypeFilter] = useState("");
   const ALL_CARD_OPTION = "ALL_CARD_TYPES";
+  const copy = useSystemCopy();
 
   // Hardcoded card types
   const cardTypes = [
@@ -136,7 +138,7 @@ export default function ReportsPage() {
                   onClick={() => {
                     const exportData =
                       stockBalance?.map((item: any) => ({
-                        "Card Type": item.cardType.name,
+                        [copy.itemTypeLabel]: item.cardType.name,
                         Code: item.cardType.code,
                         Balance: item.balance,
                         "Last Updated": format(
@@ -156,7 +158,7 @@ export default function ReportsPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Card Type</TableHead>
+                    <TableHead>{copy.itemTypeLabel}</TableHead>
                     <TableHead>Code</TableHead>
                     <TableHead className="text-right">Balance</TableHead>
                     <TableHead>Last Updated</TableHead>
@@ -221,11 +223,11 @@ export default function ReportsPage() {
                     }
                   >
                     <SelectTrigger className="w-40">
-                      <SelectValue placeholder="All Card Types" />
+                      <SelectValue placeholder={copy.itemTypeAllLabel} />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value={ALL_CARD_OPTION}>
-                        All Card Types
+                        {copy.itemTypeAllLabel}
                       </SelectItem>
                       {cardTypes?.map((type) => (
                         <SelectItem key={type.id} value={type.id.toString()}>
@@ -241,7 +243,7 @@ export default function ReportsPage() {
                       const exportData =
                         issuesReport?.issues?.map((item: any) => ({
                           Date: format(new Date(item.createdAt), "PP"),
-                          "Card Type": item.cardType.name,
+                          [copy.itemTypeLabel]: item.cardType.name,
                           Quantity: item.qty,
                           Recipient: item.issuedToName || "-",
                           Type: item.issuedToType || "-",
@@ -278,7 +280,9 @@ export default function ReportsPage() {
                       </p>
                     </div>
                     <div>
-                      <p className="text-sm text-muted-foreground">Card Types</p>
+                      <p className="text-sm text-muted-foreground">
+                        {copy.itemTypePlural}
+                      </p>
                       <p className="text-2xl font-bold">
                         {issuesReport.summary.byCardType.length}
                       </p>
@@ -290,7 +294,7 @@ export default function ReportsPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Date</TableHead>
-                    <TableHead>Card Type</TableHead>
+                    <TableHead>{copy.itemTypeLabel}</TableHead>
                     <TableHead>Quantity</TableHead>
                     <TableHead>Recipient</TableHead>
                     <TableHead>User</TableHead>
@@ -348,7 +352,7 @@ export default function ReportsPage() {
                       const exportData =
                         receiptsReport?.receipts?.map((item: any) => ({
                           Date: format(new Date(item.createdAt), "PP"),
-                          "Card Type": item.cardType.name,
+                          [copy.itemTypeLabel]: item.cardType.name,
                           Quantity: item.qty,
                           "Batch Code": item.batch?.batchCode || "-",
                           User: item.createdBy
@@ -384,7 +388,9 @@ export default function ReportsPage() {
                       </p>
                     </div>
                     <div>
-                      <p className="text-sm text-muted-foreground">Card Types</p>
+                      <p className="text-sm text-muted-foreground">
+                        {copy.itemTypePlural}
+                      </p>
                       <p className="text-2xl font-bold">
                         {receiptsReport.summary.byCardType.length}
                       </p>
@@ -396,7 +402,7 @@ export default function ReportsPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Date</TableHead>
-                    <TableHead>Card Type</TableHead>
+                    <TableHead>{copy.itemTypeLabel}</TableHead>
                     <TableHead>Quantity</TableHead>
                     <TableHead>Batch Code</TableHead>
                     <TableHead>User</TableHead>
@@ -460,7 +466,7 @@ export default function ReportsPage() {
                             ? `${item.createdBy.firstName} ${item.createdBy.lastName}`
                             : "System",
                           Type: item.type,
-                          "Card Type": item.cardType.name,
+                          [copy.itemTypeLabel]: item.cardType.name,
                           Quantity: item.qty,
                         })) || [];
                       exportToCSV(exportData, "user-activity-report");

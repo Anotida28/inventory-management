@@ -39,6 +39,7 @@ import {
 } from "lucide-react";
 import { apiRequest } from "services/api";
 import { format } from "date-fns";
+import { useSystemCopy } from "lib/system-mode";
 import {
   BarChart,
   Bar,
@@ -118,6 +119,7 @@ export default function DashboardPage() {
   
   const queryClient = useQueryClient();
   const hasAccess = true;
+  const copy = useSystemCopy();
 
   const [dateRange, setDateRange] = useState({
     startDate: "",
@@ -284,7 +286,7 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <PageHeader
         title="Dashboard"
-        description="Track card costs, revenue, and profit margins across your inventory operations."
+        description={copy.dashboardDescription}
       />
 
       {/* Filters */}
@@ -317,13 +319,15 @@ export default function DashboardPage() {
               />
             </div>
             <div>
-              <Label htmlFor="cardType">Card Type</Label>
+              <Label htmlFor="cardType">{copy.itemTypeLabel}</Label>
               <Select value={cardTypeFilter} onValueChange={setCardTypeFilter}>
                 <SelectTrigger id="cardType">
-                  <SelectValue placeholder="All Card Types" />
+                  <SelectValue placeholder={copy.itemTypeAllLabel} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={ALL_CARD_OPTION}>All Card Types</SelectItem>
+                  <SelectItem value={ALL_CARD_OPTION}>
+                    {copy.itemTypeAllLabel}
+                  </SelectItem>
                   {cardTypes.map((type) => (
                     <SelectItem key={type.id} value={type.id.toString()}>
                       {type.name}
@@ -364,13 +368,13 @@ export default function DashboardPage() {
           <StatCard
             title="Total Cost (Purchases)"
             value={formatCurrency(totals?.totalReceivedCost)}
-            description={`${formatNumber(totals?.totalReceivedQty || 0)} cards received`}
+            description={`${formatNumber(totals?.totalReceivedQty || 0)} ${copy.unitNounPlural} received`}
             icon={DollarSign}
           />
           <StatCard
             title="Total Revenue (Sales)"
             value={formatCurrency(totals?.totalIssuedRevenue)}
-            description={`${formatNumber(totals?.totalIssuedQty || 0)} cards issued`}
+            description={`${formatNumber(totals?.totalIssuedQty || 0)} ${copy.unitNounPlural} issued`}
             icon={Wallet}
           />
           <StatCard
@@ -390,7 +394,7 @@ export default function DashboardPage() {
           <StatCard
             title="Inventory Value"
             value={formatCurrency(totals?.estimatedInventoryValue)}
-            description={`${formatNumber(totals?.outstandingInventoryQty || 0)} cards in stock`}
+            description={`${formatNumber(totals?.outstandingInventoryQty || 0)} ${copy.unitNounPlural} in stock`}
             icon={Package}
           />
         </div>
@@ -403,7 +407,9 @@ export default function DashboardPage() {
             <BarChart3 className="h-4 w-4 mr-2" />
             Profit Chart
           </TabsTrigger>
-          <TabsTrigger value="by-card-type">By Card Type</TabsTrigger>
+          <TabsTrigger value="by-card-type">
+            By {copy.itemTypeLabel}
+          </TabsTrigger>
           <TabsTrigger value="transactions">Recent Transactions</TabsTrigger>
         </TabsList>
 
@@ -452,13 +458,15 @@ export default function DashboardPage() {
         <TabsContent value="by-card-type">
           <Card>
             <CardHeader>
-              <CardTitle>Financial Summary by Card Type</CardTitle>
+              <CardTitle>
+                Financial Summary by {copy.itemTypeLabel}
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Card Type</TableHead>
+                    <TableHead>{copy.itemTypeLabel}</TableHead>
                     <TableHead className="text-right">Received Qty</TableHead>
                     <TableHead className="text-right">Total Cost</TableHead>
                     <TableHead className="text-right">Avg Unit Cost</TableHead>
@@ -536,7 +544,7 @@ export default function DashboardPage() {
                   <TableRow>
                     <TableHead>ID</TableHead>
                     <TableHead>Type</TableHead>
-                    <TableHead>Card Type</TableHead>
+                    <TableHead>{copy.itemTypeLabel}</TableHead>
                     <TableHead className="text-right">Qty</TableHead>
                     <TableHead className="text-right">Unit Value</TableHead>
                     <TableHead className="text-right">Total Value</TableHead>

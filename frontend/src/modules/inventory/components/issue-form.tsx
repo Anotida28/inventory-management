@@ -22,6 +22,7 @@ import {
 } from "components/ui/file-upload-area";
 import { useToast } from "components/ui/toast-provider";
 import { apiRequest, apiFormData } from "services/api";
+import { useSystemCopy } from "lib/system-mode";
 
 type AvailableBatch = {
   id: number;
@@ -38,6 +39,7 @@ export default function IssueForm() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const copy = useSystemCopy();
   const [files, setFiles] = useState<FileWithMetadata[]>([]);
   const [formData, setFormData] = useState({
     cardTypeId: "",
@@ -74,7 +76,7 @@ export default function IssueForm() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["stock-balance"] });
       queryClient.invalidateQueries({ queryKey: ["recent-transactions"] });
-      toast({ title: "Success", description: "Cards issued successfully" });
+      toast({ title: "Success", description: "Issue recorded successfully" });
       navigate("/transactions");
     },
     onError: (error: any) => {
@@ -113,19 +115,19 @@ export default function IssueForm() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Issue Cards"
-        description="Issue cards to branches or individuals"
+        title={copy.issueTitle}
+        description={copy.issueDescription}
       />
 
       <Card>
         <CardHeader>
-          <CardTitle>Issue Cards</CardTitle>
+          <CardTitle>{copy.issueTitle}</CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid gap-6 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="cardTypeId">Card Type *</Label>
+                  <Label htmlFor="cardTypeId">{copy.itemTypeLabel} *</Label>
                   <Select
                     value={formData.cardTypeId}
                     onValueChange={(value) =>
@@ -134,7 +136,7 @@ export default function IssueForm() {
                     required
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select card type" />
+                      <SelectValue placeholder={copy.itemTypePlaceholder} />
                     </SelectTrigger>
                     <SelectContent>
                       {cardTypes?.map((type) => (
@@ -226,7 +228,7 @@ export default function IssueForm() {
                 type="submit"
                 disabled={issueMutation.isPending}
               >
-                {issueMutation.isPending ? "Issuing..." : "Issue Cards"}
+                {issueMutation.isPending ? "Issuing..." : copy.issueTitle}
               </Button>
             </div>
           </form>

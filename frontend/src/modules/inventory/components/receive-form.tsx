@@ -22,11 +22,13 @@ import {
 } from "components/ui/file-upload-area";
 import { useToast } from "components/ui/toast-provider";
 import { apiRequest, apiFormData } from "services/api";
+import { useSystemCopy } from "lib/system-mode";
 
 export default function ReceiveForm() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const copy = useSystemCopy();
   const [files, setFiles] = useState<FileWithMetadata[]>([]);
   const [formData, setFormData] = useState({
     cardTypeId: "",
@@ -49,7 +51,7 @@ export default function ReceiveForm() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["stock-balance"] });
       queryClient.invalidateQueries({ queryKey: ["recent-transactions"] });
-      toast({ title: "Success", description: "Cards received successfully" });
+      toast({ title: "Success", description: "Receipt recorded successfully" });
       navigate("/transactions");
     },
     onError: (error: any) => {
@@ -88,19 +90,19 @@ export default function ReceiveForm() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Receive Cards"
-        description="Record a new batch of cards received"
+        title={copy.receiveTitle}
+        description={copy.receiveDescription}
       />
 
       <Card>
         <CardHeader>
-          <CardTitle>Receive Card Batch</CardTitle>
+          <CardTitle>{copy.receivePanelTitle}</CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid gap-6 md:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="cardTypeId">Card Type *</Label>
+                <Label htmlFor="cardTypeId">{copy.itemTypeLabel} *</Label>
                 <Select
                   value={formData.cardTypeId}
                   onValueChange={(value) =>
@@ -109,7 +111,7 @@ export default function ReceiveForm() {
                   required
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select card type" />
+                    <SelectValue placeholder={copy.itemTypePlaceholder} />
                   </SelectTrigger>
                   <SelectContent>
                     {Array.isArray(cardTypes) && cardTypes.map((type) => (
@@ -197,7 +199,9 @@ export default function ReceiveForm() {
                 type="submit"
                 disabled={receiveMutation.isPending}
               >
-                {receiveMutation.isPending ? "Receiving..." : "Receive Cards"}
+                {receiveMutation.isPending
+                  ? "Receiving..."
+                  : copy.receiveTitle}
               </Button>
             </div>
           </form>
