@@ -13,7 +13,7 @@ export const DEFAULT_TRANSACTION_FILTERS: TransactionFilters = {
   startDate: "",
   endDate: "",
   page: 1,
-  limit: 20,
+  limit: 10,
 };
 
 export const buildTransactionQueryParams = (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { PageHeader } from "components/ui/page-header";
@@ -59,6 +59,8 @@ export default function AdjustPage() {
     notes: "",
   });
   const [adjustmentSearch, setAdjustmentSearch] = useState("");
+  const [adjustmentsPage, setAdjustmentsPage] = useState(1);
+  const ADJUSTMENTS_PAGE_SIZE = 10;
 
   const { data: itemTypes = [] } = useQuery<ItemType[]>({
     queryKey: ["item-types", mode],
@@ -95,6 +97,30 @@ export default function AdjustPage() {
         return haystack.includes(normalizedAdjustmentSearch);
       })
     : adjustments?.adjustments ?? [];
+
+  useEffect(() => {
+    setAdjustmentsPage(1);
+  }, [adjustmentSearch, mode]);
+
+  const totalAdjustments = filteredAdjustments.length;
+  const totalAdjustmentPages = Math.max(
+    Math.ceil(totalAdjustments / ADJUSTMENTS_PAGE_SIZE),
+    1,
+  );
+  const clampedAdjustmentsPage = Math.min(
+    adjustmentsPage,
+    totalAdjustmentPages,
+  );
+  const pagedAdjustments = filteredAdjustments.slice(
+    (clampedAdjustmentsPage - 1) * ADJUSTMENTS_PAGE_SIZE,
+    clampedAdjustmentsPage * ADJUSTMENTS_PAGE_SIZE,
+  );
+
+  useEffect(() => {
+    if (adjustmentsPage > totalAdjustmentPages) {
+      setAdjustmentsPage(totalAdjustmentPages);
+    }
+  }, [adjustmentsPage, totalAdjustmentPages]);
 
   const adjustMutation = useMutation({
     mutationFn: async (data: FormData) => {
@@ -331,7 +357,7 @@ export default function AdjustPage() {
             value={adjustmentSearch}
             onChange={(e) => setAdjustmentSearch(e.target.value)}
             placeholder="Search adjustments..."
-            className="h-9 w-full sm:w-56"
+            className="h-9 w-full sm:w-32"
           />
         </CardHeader>
         <CardContent>
@@ -346,7 +372,7 @@ export default function AdjustPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredAdjustments.length === 0 ? (
+              {totalAdjustments === 0 ? (
                 <TableRow>
                   <TableCell
                     colSpan={5}
@@ -358,7 +384,7 @@ export default function AdjustPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredAdjustments.map((adj: any) => (
+                pagedAdjustments.map((adj: any) => (
                   <TableRow key={adj.id}>
                     <TableCell>
                       {format(new Date(adj.createdAt), "MMM d, yyyy HH:mm")}
@@ -385,6 +411,40 @@ export default function AdjustPage() {
               )}
             </TableBody>
           </Table>
+          {totalAdjustments > 0 && (
+            <div className="mt-4 flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">
+                Showing {(clampedAdjustmentsPage - 1) * ADJUSTMENTS_PAGE_SIZE + 1} to{" "}
+                {Math.min(
+                  clampedAdjustmentsPage * ADJUSTMENTS_PAGE_SIZE,
+                  totalAdjustments,
+                )}{" "}
+                of {totalAdjustments} adjustments
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={clampedAdjustmentsPage === 1}
+                  onClick={() =>
+                    setAdjustmentsPage(clampedAdjustmentsPage - 1)
+                  }
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={clampedAdjustmentsPage >= totalAdjustmentPages}
+                  onClick={() =>
+                    setAdjustmentsPage(clampedAdjustmentsPage + 1)
+                  }
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

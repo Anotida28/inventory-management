@@ -131,6 +131,10 @@ export default function DashboardPage() {
   const [itemTypeFilter, setItemTypeFilter] = useState("");
   const [byItemTypeSearch, setByItemTypeSearch] = useState("");
   const [transactionsSearch, setTransactionsSearch] = useState("");
+  const [transactionsPage, setTransactionsPage] = useState(1);
+  const TRANSACTIONS_PAGE_SIZE = 10;
+  const [byItemTypePage, setByItemTypePage] = useState(1);
+  const BY_ITEM_PAGE_SIZE = 10;
 
   // Editing state
   const [editingTransaction, setEditingTransaction] = useState<{
@@ -176,6 +180,14 @@ export default function DashboardPage() {
   useEffect(() => {
     setItemTypeFilter("");
   }, [mode]);
+
+  useEffect(() => {
+    setTransactionsPage(1);
+  }, [transactionsSearch, mode, dateRange.startDate, dateRange.endDate, itemTypeFilter]);
+
+  useEffect(() => {
+    setByItemTypePage(1);
+  }, [byItemTypeSearch, mode, dateRange.startDate, dateRange.endDate, itemTypeFilter]);
 
   // Update transaction mutation
   const updateMutation = useMutation({
@@ -296,19 +308,6 @@ export default function DashboardPage() {
     return formatCurrency(numericValue);
   };
 
-  if (!hasAccess) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
-        <AlertTriangle className="h-16 w-16 text-amber-500 dark:text-amber-400" />
-        <h2 className="text-xl font-semibold">Access Denied</h2>
-        <p className="text-muted-foreground text-center max-w-md">
-          This page is only accessible to Finance and Admin users. Please
-          contact your administrator if you need access.
-        </p>
-      </div>
-    );
-  }
-
   const totals = financeData?.totals;
   const byItemType = financeData?.byItemType || [];
   const chartData = financeData?.chartData || [];
@@ -370,6 +369,56 @@ export default function DashboardPage() {
         return haystack.includes(normalizedTransactionsSearch);
       })
     : recentTransactions;
+
+  const totalTransactions = filteredRecentTransactions.length;
+  const totalTransactionPages = Math.max(
+    Math.ceil(totalTransactions / TRANSACTIONS_PAGE_SIZE),
+    1,
+  );
+  const clampedTransactionsPage = Math.min(
+    transactionsPage,
+    totalTransactionPages,
+  );
+  const pagedTransactions = filteredRecentTransactions.slice(
+    (clampedTransactionsPage - 1) * TRANSACTIONS_PAGE_SIZE,
+    clampedTransactionsPage * TRANSACTIONS_PAGE_SIZE,
+  );
+
+  useEffect(() => {
+    if (transactionsPage > totalTransactionPages) {
+      setTransactionsPage(totalTransactionPages);
+    }
+  }, [transactionsPage, totalTransactionPages]);
+
+  const totalByItemTypes = filteredByItemType.length;
+  const totalByItemTypePages = Math.max(
+    Math.ceil(totalByItemTypes / BY_ITEM_PAGE_SIZE),
+    1,
+  );
+  const clampedByItemTypePage = Math.min(byItemTypePage, totalByItemTypePages);
+  const pagedByItemType = filteredByItemType.slice(
+    (clampedByItemTypePage - 1) * BY_ITEM_PAGE_SIZE,
+    clampedByItemTypePage * BY_ITEM_PAGE_SIZE,
+  );
+
+  useEffect(() => {
+    if (byItemTypePage > totalByItemTypePages) {
+      setByItemTypePage(totalByItemTypePages);
+    }
+  }, [byItemTypePage, totalByItemTypePages]);
+
+  if (!hasAccess) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
+        <AlertTriangle className="h-16 w-16 text-amber-500 dark:text-amber-400" />
+        <h2 className="text-xl font-semibold">Access Denied</h2>
+        <p className="text-muted-foreground text-center max-w-md">
+          This page is only accessible to Finance and Admin users. Please
+          contact your administrator if you need access.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -554,7 +603,7 @@ export default function DashboardPage() {
                 value={byItemTypeSearch}
                 onChange={(e) => setByItemTypeSearch(e.target.value)}
                 placeholder={`Search ${copy.itemTypeLabel.toLowerCase()}...`}
-                className="h-9 w-full sm:w-60"
+                className="h-9 w-full sm:w-32"
               />
             </CardHeader>
             <CardContent>
@@ -573,7 +622,7 @@ export default function DashboardPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredByItemType.length === 0 ? (
+                  {totalByItemTypes === 0 ? (
                     <TableRow>
                       <TableCell colSpan={9} className="text-center py-8">
                         {normalizedByItemTypeSearch
@@ -582,7 +631,7 @@ export default function DashboardPage() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredByItemType.map((item) => (
+                    pagedByItemType.map((item) => (
                       <TableRow key={item.itemType.id}>
                         <TableCell className="font-medium">
                           {item.itemType.name}
@@ -625,6 +674,36 @@ export default function DashboardPage() {
                   )}
                 </TableBody>
               </Table>
+              {totalByItemTypes > 0 && (
+                <div className="mt-4 flex items-center justify-between">
+                  <p className="text-sm text-muted-foreground">
+                    Showing {(clampedByItemTypePage - 1) * BY_ITEM_PAGE_SIZE + 1} to{" "}
+                    {Math.min(
+                      clampedByItemTypePage * BY_ITEM_PAGE_SIZE,
+                      totalByItemTypes,
+                    )}{" "}
+                    of {totalByItemTypes} {copy.itemTypePlural.toLowerCase()}
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={clampedByItemTypePage === 1}
+                      onClick={() => setByItemTypePage(clampedByItemTypePage - 1)}
+                    >
+                      Previous
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={clampedByItemTypePage >= totalByItemTypePages}
+                      onClick={() => setByItemTypePage(clampedByItemTypePage + 1)}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -633,12 +712,12 @@ export default function DashboardPage() {
         <TabsContent value="transactions">
           <Card>
             <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <CardTitle>Recent Transactions (Edit Financial Values)</CardTitle>
+              <CardTitle>Transactions</CardTitle>
               <Input
                 value={transactionsSearch}
                 onChange={(e) => setTransactionsSearch(e.target.value)}
                 placeholder="Search transactions..."
-                className="h-9 w-full sm:w-64"
+                className="h-9 w-full sm:w-32"
               />
             </CardHeader>
             <CardContent>
@@ -656,7 +735,7 @@ export default function DashboardPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredRecentTransactions.length === 0 ? (
+                  {totalTransactions === 0 ? (
                     <TableRow>
                       <TableCell colSpan={8} className="text-center py-8">
                         {normalizedTransactionsSearch
@@ -665,7 +744,7 @@ export default function DashboardPage() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredRecentTransactions.map((txn) => {
+                    pagedTransactions.map((txn) => {
                       const isEditing = editingTransaction?.id === txn.id;
                       const isReversed = txn.status === "REVERSED";
                       const unitValue =
@@ -861,6 +940,40 @@ export default function DashboardPage() {
                   )}
                 </TableBody>
               </Table>
+              {totalTransactions > 0 && (
+                <div className="mt-4 flex items-center justify-between">
+                  <p className="text-sm text-muted-foreground">
+                    Showing {(clampedTransactionsPage - 1) * TRANSACTIONS_PAGE_SIZE + 1} to{" "}
+                    {Math.min(
+                      clampedTransactionsPage * TRANSACTIONS_PAGE_SIZE,
+                      totalTransactions,
+                    )}{" "}
+                    of {totalTransactions} transactions
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={clampedTransactionsPage === 1}
+                      onClick={() =>
+                        setTransactionsPage(clampedTransactionsPage - 1)
+                      }
+                    >
+                      Previous
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={clampedTransactionsPage >= totalTransactionPages}
+                      onClick={() =>
+                        setTransactionsPage(clampedTransactionsPage + 1)
+                      }
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

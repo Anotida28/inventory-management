@@ -39,6 +39,7 @@ export default function ReceiveForm() {
   const [files, setFiles] = useState<FileWithMetadata[]>([]);
   const [formData, setFormData] = useState({
     itemTypeId: "",
+    itemTypeName: "",
     batchCode: "",
     qtyReceived: "",
     receivedAt: new Date().toISOString().split("T")[0],
@@ -74,12 +75,63 @@ export default function ReceiveForm() {
     },
   });
 
+  const normalizeName = (value: string) => value.trim().toLowerCase();
+  const toItemTypeCode = (value: string) =>
+    value
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 20) || "NEW";
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    let itemTypeId = formData.itemTypeId;
+    if (mode === "INVENTORY") {
+      const typedName = formData.itemTypeName.trim();
+      if (!typedName) {
+        toast({
+          title: "Item type required",
+          description: "Enter the item type you are receiving.",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (!itemTypeId) {
+        try {
+          const created = await apiRequest<ItemType>("/api/item-types", {
+            method: "POST",
+            body: JSON.stringify({
+              name: typedName,
+              code: toItemTypeCode(typedName),
+            }),
+          });
+          itemTypeId = String(created.id);
+          queryClient.invalidateQueries({ queryKey: ["item-types"] });
+        } catch (error: any) {
+          toast({
+            title: "Unable to create item type",
+            description: error.message,
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+    }
+
+    if (!itemTypeId) {
+      toast({
+        title: "Item type required",
+        description: "Select the item type you are receiving.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     // Create receive transaction with files
     const submitFormData = new FormData();
-    submitFormData.append("itemTypeId", formData.itemTypeId);
+    submitFormData.append("itemTypeId", itemTypeId);
     submitFormData.append("batchCode", formData.batchCode);
     submitFormData.append("qtyReceived", formData.qtyReceived);
     if (formData.receivedAt) {
@@ -111,47 +163,85 @@ export default function ReceiveForm() {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid gap-6 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="itemTypeId">{copy.itemTypeLabel} *</Label>
-                <Select
-                  value={formData.itemTypeId}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, itemTypeId: value })
-                  }
-                  required
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder={copy.itemTypePlaceholder} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {isLoadingItemTypes ? (
-                      <SelectItem value="loading" disabled>
-                        Loading item types...
-                      </SelectItem>
-                    ) : itemTypes.length === 0 ? (
-                      <SelectItem value="empty" disabled>
-                        No item types available
-                      </SelectItem>
-                    ) : (
-                      itemTypes.map((type) => (
-                        <SelectItem key={type.id} value={type.id.toString()}>
-                          {type.name} ({type.code})
+              {mode === "INVENTORY" ? (
+                <div className="space-y-2">
+                  <Label htmlFor="itemTypeName">{copy.itemTypeLabel} *</Label>
+                  <Input
+                    id="itemTypeName"
+                    value={formData.itemTypeName}
+                    onChange={(e) => {
+                      const nextValue = e.target.value;
+                      const match = itemTypes.find(
+                        (type) => normalizeName(type.name) === normalizeName(nextValue),
+                      );
+                      setFormData({
+                        ...formData,
+                        itemTypeName: nextValue,
+                        itemTypeId: match ? String(match.id) : "",
+                      });
+                    }}
+                    placeholder={`Type ${copy.itemTypeLabel.toLowerCase()}`}
+                    list="inventory-item-types"
+                    required
+                  />
+                  <datalist id="inventory-item-types">
+                    {itemTypes.map((type) => (
+                      <option key={type.id} value={type.name} />
+                    ))}
+                  </datalist>
+                  <p className="text-xs text-muted-foreground">
+                    Start typing to add a new item type or match an existing one.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Label htmlFor="itemTypeId">{copy.itemTypeLabel} *</Label>
+                  <Select
+                    value={formData.itemTypeId}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, itemTypeId: value })
+                    }
+                    required
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={copy.itemTypePlaceholder} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {isLoadingItemTypes ? (
+                        <SelectItem value="loading" disabled>
+                          Loading item types...
                         </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
+                      ) : itemTypes.length === 0 ? (
+                        <SelectItem value="empty" disabled>
+                          No item types available
+                        </SelectItem>
+                      ) : (
+                        itemTypes.map((type) => (
+                          <SelectItem key={type.id} value={type.id.toString()}>
+                            {type.name} ({type.code})
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
               <div className="space-y-2">
-                <Label htmlFor="batchCode">Batch Code *</Label>
+                <Label htmlFor="batchCode">
+                  {mode === "INVENTORY" ? "Batch / Serial Number" : "Batch Code"} *
+                </Label>
                 <Input
                   id="batchCode"
                   value={formData.batchCode}
                   onChange={(e) =>
                     setFormData({ ...formData, batchCode: e.target.value })
                   }
-                  placeholder="e.g., BATCH-001"
+                  placeholder={
+                    mode === "INVENTORY"
+                      ? "e.g., SERIAL-001 or BATCH-001"
+                      : "e.g., BATCH-001"
+                  }
                   required
                 />
               </div>

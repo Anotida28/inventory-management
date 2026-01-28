@@ -75,7 +75,7 @@ export default function TransactionHistoryTable({
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           placeholder="Search transactions..."
-          className="w-full sm:w-64"
+          className="h-9 w-full sm:w-32"
         />
       </CardHeader>
       <CardContent>

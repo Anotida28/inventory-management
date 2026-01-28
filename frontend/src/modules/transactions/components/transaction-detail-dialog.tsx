@@ -14,7 +14,7 @@ import { Label } from "components/ui/label";
 import { format } from "date-fns";
 import { Download, FileText } from "lucide-react";
 import type { Dispatch, SetStateAction } from "react";
-import { useSystemCopy } from "lib/system-mode";
+import { useSystemCopy, useSystemMode } from "lib/system-mode";
 
 type ValueForm = {
   unitCost: string;
@@ -49,6 +49,7 @@ export default function TransactionDetailDialog({
   getTypeBadgeVariant,
 }: TransactionDetailDialogProps) {
   const copy = useSystemCopy();
+  const { mode } = useSystemMode();
   const isReversed = selectedTransaction?.status === "REVERSED";
   const allowEdit = canEditFinancials && !isReversed;
 
@@ -168,7 +169,9 @@ export default function TransactionDetailDialog({
               )}
               {selectedTransaction.batch && (
                 <div>
-                  <Label className="text-xs text-muted-foreground">Batch</Label>
+                  <Label className="text-xs text-muted-foreground">
+                    {mode === "INVENTORY" ? "Batch / Serial Number" : "Batch"}
+                  </Label>
                   <p className="font-medium">
                     {selectedTransaction.batch.batchCode}
                   </p>

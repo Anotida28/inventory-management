@@ -102,7 +102,7 @@ export default function IssueForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (mode === "INVENTORY" && !formData.branchName.trim()) {
+    if (formData.issuedToType === "BRANCH" && !formData.branchName.trim()) {
       toast({
         title: "Branch required",
         description: "Enter a branch name before issuing.",
@@ -110,24 +110,13 @@ export default function IssueForm() {
       });
       return;
     }
-
-    if (mode === "CARDS") {
-      if (formData.issuedToType === "BRANCH" && !formData.branchName.trim()) {
-        toast({
-          title: "Branch required",
-          description: "Enter a branch name before issuing.",
-          variant: "destructive",
-        });
-        return;
-      }
-      if (formData.issuedToType === "PERSON" && !formData.issuedToName.trim()) {
-        toast({
-          title: "Recipient required",
-          description: "Enter the recipient name.",
-          variant: "destructive",
-        });
-        return;
-      }
+    if (formData.issuedToType === "PERSON" && !formData.issuedToName.trim()) {
+      toast({
+        title: "Recipient required",
+        description: "Enter the recipient name.",
+        variant: "destructive",
+      });
+      return;
     }
 
     if (!formData.batchId) {
@@ -221,32 +210,32 @@ export default function IssueForm() {
                   />
                 </div>
 
-                {mode === "CARDS" ? (
-                  <div className="space-y-2">
-                    <Label htmlFor="issuedToType">Issue To *</Label>
-                    <Select
-                      value={formData.issuedToType}
-                      onValueChange={(value: "BRANCH" | "PERSON") =>
-                        setFormData({
-                          ...formData,
-                          issuedToType: value,
-                          branchName: value === "BRANCH" ? formData.branchName : "",
-                          issuedToName:
-                            value === "PERSON" ? formData.issuedToName : "",
-                        })
-                      }
-                      required
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select recipient type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="BRANCH">Branch</SelectItem>
-                        <SelectItem value="PERSON">Person</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                ) : (
+                <div className="space-y-2">
+                  <Label htmlFor="issuedToType">Issue To *</Label>
+                  <Select
+                    value={formData.issuedToType}
+                    onValueChange={(value: "BRANCH" | "PERSON") =>
+                      setFormData({
+                        ...formData,
+                        issuedToType: value,
+                        branchName: value === "BRANCH" ? formData.branchName : "",
+                        issuedToName:
+                          value === "PERSON" ? formData.issuedToName : "",
+                      })
+                    }
+                    required
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select recipient type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="BRANCH">Branch</SelectItem>
+                      <SelectItem value="PERSON">Person</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {formData.issuedToType === "BRANCH" && (
                   <div className="space-y-2">
                     <Label htmlFor="branchName">Branch *</Label>
                     <Input
@@ -261,22 +250,7 @@ export default function IssueForm() {
                   </div>
                 )}
 
-                {mode === "CARDS" && formData.issuedToType === "BRANCH" && (
-                  <div className="space-y-2">
-                    <Label htmlFor="branchName">Branch *</Label>
-                    <Input
-                      id="branchName"
-                      value={formData.branchName}
-                      onChange={(e) =>
-                        setFormData({ ...formData, branchName: e.target.value })
-                      }
-                      placeholder="Enter branch name"
-                      required
-                    />
-                  </div>
-                )}
-
-                {mode === "CARDS" && formData.issuedToType === "PERSON" && (
+                {formData.issuedToType === "PERSON" && (
                   <div className="space-y-2">
                     <Label htmlFor="issuedToName">Recipient Name *</Label>
                     <Input
@@ -294,7 +268,9 @@ export default function IssueForm() {
               </div>
 
             <div className="space-y-2">
-              <Label htmlFor="batchId">Batch *</Label>
+              <Label htmlFor="batchId">
+                {mode === "INVENTORY" ? "Batch / Serial Number" : "Batch"} *
+              </Label>
               <Select
                 value={formData.batchId}
                 onValueChange={(value) =>
@@ -303,7 +279,13 @@ export default function IssueForm() {
                 required
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select batch" />
+                  <SelectValue
+                    placeholder={
+                      mode === "INVENTORY"
+                        ? "Select batch / serial number"
+                        : "Select batch"
+                    }
+                  />
                 </SelectTrigger>
                 <SelectContent>
                   {batches.length === 0 ? (

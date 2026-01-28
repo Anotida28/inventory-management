@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CheckCircle2,
@@ -52,6 +52,8 @@ export default function ItemTypesPage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [itemTypesPage, setItemTypesPage] = useState(1);
+  const ITEM_TYPES_PAGE_SIZE = 10;
   const [editingItemType, setEditingItemType] = useState<ItemType | null>(null);
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -161,6 +163,27 @@ export default function ItemTypesPage() {
       ),
     );
   }, [itemTypes, searchTerm]);
+
+  useEffect(() => {
+    setItemTypesPage(1);
+  }, [searchTerm, mode]);
+
+  const totalItemTypes = filteredItemTypes.length;
+  const totalItemTypePages = Math.max(
+    Math.ceil(totalItemTypes / ITEM_TYPES_PAGE_SIZE),
+    1,
+  );
+  const clampedItemTypesPage = Math.min(itemTypesPage, totalItemTypePages);
+  const pagedItemTypes = filteredItemTypes.slice(
+    (clampedItemTypesPage - 1) * ITEM_TYPES_PAGE_SIZE,
+    clampedItemTypesPage * ITEM_TYPES_PAGE_SIZE,
+  );
+
+  useEffect(() => {
+    if (itemTypesPage > totalItemTypePages) {
+      setItemTypesPage(totalItemTypePages);
+    }
+  }, [itemTypesPage, totalItemTypePages]);
 
   const handleEdit = (itemType: ItemType) => {
     if (!canManage) return;
@@ -292,12 +315,12 @@ export default function ItemTypesPage() {
               Track and manage the catalogue of stock-managed items.
             </p>
           </div>
-          <div className="flex w-full gap-3 md:w-80">
+          <div className="flex w-full gap-3 md:w-40">
             <Input
               placeholder="Search by name or code..."
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
-              className="bg-background"
+              className="h-9 w-full bg-background"
             />
           </div>
         </CardHeader>
@@ -325,7 +348,7 @@ export default function ItemTypesPage() {
                       Loading item types...
                     </TableCell>
                   </TableRow>
-                ) : filteredItemTypes.length === 0 ? (
+                ) : totalItemTypes === 0 ? (
                   <TableRow>
                     <TableCell
                       colSpan={5}
@@ -335,7 +358,7 @@ export default function ItemTypesPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredItemTypes.map((itemType) => (
+                  pagedItemTypes.map((itemType) => (
                     <TableRow key={itemType.id} className="hover:bg-blue-50/30 dark:hover:bg-blue-500/10">
                       <TableCell className="font-semibold text-foreground">
                         {itemType.code}
@@ -402,6 +425,36 @@ export default function ItemTypesPage() {
               </TableBody>
             </Table>
           </div>
+          {totalItemTypes > 0 && (
+            <div className="mt-4 flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">
+                Showing {(clampedItemTypesPage - 1) * ITEM_TYPES_PAGE_SIZE + 1} to{" "}
+                {Math.min(
+                  clampedItemTypesPage * ITEM_TYPES_PAGE_SIZE,
+                  totalItemTypes,
+                )}{" "}
+                of {totalItemTypes} item types
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={clampedItemTypesPage === 1}
+                  onClick={() => setItemTypesPage(clampedItemTypesPage - 1)}
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={clampedItemTypesPage >= totalItemTypePages}
+                  onClick={() => setItemTypesPage(clampedItemTypesPage + 1)}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 

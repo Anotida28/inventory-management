@@ -44,6 +44,11 @@ export default function ReportsPage() {
   const [issuesSearch, setIssuesSearch] = useState("");
   const [receiptsSearch, setReceiptsSearch] = useState("");
   const [activitySearch, setActivitySearch] = useState("");
+  const [stockPage, setStockPage] = useState(1);
+  const [issuesPage, setIssuesPage] = useState(1);
+  const [receiptsPage, setReceiptsPage] = useState(1);
+  const [activityPage, setActivityPage] = useState(1);
+  const PAGE_SIZE = 10;
   const ALL_ITEM_OPTION = "ALL_ITEM_TYPES";
   const copy = useSystemCopy();
   const { mode } = useSystemMode();
@@ -61,6 +66,34 @@ export default function ReportsPage() {
   useEffect(() => {
     setItemTypeFilter("");
   }, [mode]);
+
+  useEffect(() => {
+    setStockPage(1);
+  }, [stockSearch, mode]);
+
+  useEffect(() => {
+    setIssuesPage(1);
+  }, [
+    issuesSearch,
+    dateRange.startDate,
+    dateRange.endDate,
+    itemTypeFilter,
+    mode,
+  ]);
+
+  useEffect(() => {
+    setReceiptsPage(1);
+  }, [
+    receiptsSearch,
+    dateRange.startDate,
+    dateRange.endDate,
+    itemTypeFilter,
+    mode,
+  ]);
+
+  useEffect(() => {
+    setActivityPage(1);
+  }, [activitySearch, dateRange.startDate, dateRange.endDate, mode]);
 
   const { data: stockBalance } = useQuery({
     queryKey: ["stock-balance", mode],
@@ -174,6 +207,62 @@ export default function ReportsPage() {
       })
     : userActivityReport?.byUser ?? [];
 
+  const stockTotal = filteredStockBalance.length;
+  const stockTotalPages = Math.max(Math.ceil(stockTotal / PAGE_SIZE), 1);
+  const stockPageSafe = Math.min(stockPage, stockTotalPages);
+  const pagedStockBalance = filteredStockBalance.slice(
+    (stockPageSafe - 1) * PAGE_SIZE,
+    stockPageSafe * PAGE_SIZE,
+  );
+
+  const issuesTotal = filteredIssues.length;
+  const issuesTotalPages = Math.max(Math.ceil(issuesTotal / PAGE_SIZE), 1);
+  const issuesPageSafe = Math.min(issuesPage, issuesTotalPages);
+  const pagedIssues = filteredIssues.slice(
+    (issuesPageSafe - 1) * PAGE_SIZE,
+    issuesPageSafe * PAGE_SIZE,
+  );
+
+  const receiptsTotal = filteredReceipts.length;
+  const receiptsTotalPages = Math.max(Math.ceil(receiptsTotal / PAGE_SIZE), 1);
+  const receiptsPageSafe = Math.min(receiptsPage, receiptsTotalPages);
+  const pagedReceipts = filteredReceipts.slice(
+    (receiptsPageSafe - 1) * PAGE_SIZE,
+    receiptsPageSafe * PAGE_SIZE,
+  );
+
+  const activityTotal = filteredUserGroups.length;
+  const activityTotalPages = Math.max(Math.ceil(activityTotal / PAGE_SIZE), 1);
+  const activityPageSafe = Math.min(activityPage, activityTotalPages);
+  const pagedUserGroups = filteredUserGroups.slice(
+    (activityPageSafe - 1) * PAGE_SIZE,
+    activityPageSafe * PAGE_SIZE,
+  );
+
+  useEffect(() => {
+    if (stockPage > stockTotalPages) {
+      setStockPage(stockTotalPages);
+    }
+  }, [stockPage, stockTotalPages]);
+
+  useEffect(() => {
+    if (issuesPage > issuesTotalPages) {
+      setIssuesPage(issuesTotalPages);
+    }
+  }, [issuesPage, issuesTotalPages]);
+
+  useEffect(() => {
+    if (receiptsPage > receiptsTotalPages) {
+      setReceiptsPage(receiptsTotalPages);
+    }
+  }, [receiptsPage, receiptsTotalPages]);
+
+  useEffect(() => {
+    if (activityPage > activityTotalPages) {
+      setActivityPage(activityTotalPages);
+    }
+  }, [activityPage, activityTotalPages]);
+
   const exportToCSV = (data: any[], filename: string) => {
     if (!data || data.length === 0) return;
 
@@ -228,7 +317,7 @@ export default function ReportsPage() {
                     value={stockSearch}
                     onChange={(e) => setStockSearch(e.target.value)}
                     placeholder="Search stock..."
-                    className="h-9 w-full sm:w-56"
+                    className="h-9 w-full sm:w-32"
                   />
                   <Button
                     variant="outline"
@@ -264,7 +353,7 @@ export default function ReportsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredStockBalance.length === 0 ? (
+                  {stockTotal === 0 ? (
                     <TableRow>
                       <TableCell
                         colSpan={4}
@@ -276,7 +365,7 @@ export default function ReportsPage() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredStockBalance.map((item: any) => (
+                    pagedStockBalance.map((item: any) => (
                       <TableRow key={item.id}>
                         <TableCell className="font-medium">
                           {item.itemType.name}
@@ -299,6 +388,32 @@ export default function ReportsPage() {
                   )}
                 </TableBody>
               </Table>
+              {stockTotal > 0 && (
+                <div className="mt-4 flex items-center justify-between">
+                  <p className="text-sm text-muted-foreground">
+                    Showing {(stockPageSafe - 1) * PAGE_SIZE + 1} to{" "}
+                    {Math.min(stockPageSafe * PAGE_SIZE, stockTotal)} of {stockTotal} items
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={stockPageSafe === 1}
+                      onClick={() => setStockPage(stockPageSafe - 1)}
+                    >
+                      Previous
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={stockPageSafe >= stockTotalPages}
+                      onClick={() => setStockPage(stockPageSafe + 1)}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -352,7 +467,7 @@ export default function ReportsPage() {
                     value={issuesSearch}
                     onChange={(e) => setIssuesSearch(e.target.value)}
                     placeholder="Search issues..."
-                    className="h-9 w-full sm:w-56"
+                    className="h-9 w-full sm:w-32"
                   />
                   <Button
                     variant="outline"
@@ -419,7 +534,7 @@ export default function ReportsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredIssues.length === 0 ? (
+                  {issuesTotal === 0 ? (
                     <TableRow>
                       <TableCell
                         colSpan={5}
@@ -431,7 +546,7 @@ export default function ReportsPage() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredIssues.map((item: any) => (
+                    pagedIssues.map((item: any) => (
                       <TableRow key={item.id}>
                         <TableCell>
                           {format(new Date(item.createdAt), "MMM d, yyyy")}
@@ -451,6 +566,32 @@ export default function ReportsPage() {
                   )}
                 </TableBody>
               </Table>
+              {issuesTotal > 0 && (
+                <div className="mt-4 flex items-center justify-between">
+                  <p className="text-sm text-muted-foreground">
+                    Showing {(issuesPageSafe - 1) * PAGE_SIZE + 1} to{" "}
+                    {Math.min(issuesPageSafe * PAGE_SIZE, issuesTotal)} of {issuesTotal} issues
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={issuesPageSafe === 1}
+                      onClick={() => setIssuesPage(issuesPageSafe - 1)}
+                    >
+                      Previous
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={issuesPageSafe >= issuesTotalPages}
+                      onClick={() => setIssuesPage(issuesPageSafe + 1)}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -482,7 +623,7 @@ export default function ReportsPage() {
                     value={receiptsSearch}
                     onChange={(e) => setReceiptsSearch(e.target.value)}
                     placeholder="Search receipts..."
-                    className="h-9 w-full sm:w-56"
+                    className="h-9 w-full sm:w-32"
                   />
                   <Button
                     variant="outline"
@@ -493,7 +634,9 @@ export default function ReportsPage() {
                           Date: format(new Date(item.createdAt), "PP"),
                           [copy.itemTypeLabel]: item.itemType.name,
                           Quantity: item.qty,
-                          "Batch Code": item.batch?.batchCode || "-",
+                          [mode === "INVENTORY"
+                            ? "Batch / Serial Number"
+                            : "Batch Code"]: item.batch?.batchCode || "-",
                           User: item.createdBy
                             ? `${item.createdBy.firstName} ${item.createdBy.lastName}`
                             : "System",
@@ -543,12 +686,14 @@ export default function ReportsPage() {
                     <TableHead>Date</TableHead>
                     <TableHead>{copy.itemTypeLabel}</TableHead>
                     <TableHead>Quantity</TableHead>
-                    <TableHead>Batch Code</TableHead>
+                    <TableHead>
+                      {mode === "INVENTORY" ? "Batch / Serial Number" : "Batch Code"}
+                    </TableHead>
                     <TableHead>User</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredReceipts.length === 0 ? (
+                  {receiptsTotal === 0 ? (
                     <TableRow>
                       <TableCell
                         colSpan={5}
@@ -560,7 +705,7 @@ export default function ReportsPage() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredReceipts.map((item: any) => (
+                    pagedReceipts.map((item: any) => (
                       <TableRow key={item.id}>
                         <TableCell>
                           {format(new Date(item.createdAt), "MMM d, yyyy")}
@@ -578,6 +723,32 @@ export default function ReportsPage() {
                   )}
                 </TableBody>
               </Table>
+              {receiptsTotal > 0 && (
+                <div className="mt-4 flex items-center justify-between">
+                  <p className="text-sm text-muted-foreground">
+                    Showing {(receiptsPageSafe - 1) * PAGE_SIZE + 1} to{" "}
+                    {Math.min(receiptsPageSafe * PAGE_SIZE, receiptsTotal)} of {receiptsTotal} receipts
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={receiptsPageSafe === 1}
+                      onClick={() => setReceiptsPage(receiptsPageSafe - 1)}
+                    >
+                      Previous
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={receiptsPageSafe >= receiptsTotalPages}
+                      onClick={() => setReceiptsPage(receiptsPageSafe + 1)}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -611,7 +782,7 @@ export default function ReportsPage() {
                     value={activitySearch}
                     onChange={(e) => setActivitySearch(e.target.value)}
                     placeholder="Search users..."
-                    className="h-9 w-full sm:w-56"
+                    className="h-9 w-full sm:w-32"
                   />
                   <Button
                     variant="outline"
@@ -658,14 +829,14 @@ export default function ReportsPage() {
                 </div>
               )}
               <div className="space-y-4">
-                {filteredUserGroups.length === 0 ? (
+                {activityTotal === 0 ? (
                   <div className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
                     {normalizedActivitySearch
                       ? "No matching users"
                       : "No user activity available"}
                   </div>
                 ) : (
-                  filteredUserGroups.map((userGroup: any) => (
+                  pagedUserGroups.map((userGroup: any) => (
                     <div
                       key={userGroup.user.id}
                       className="rounded-lg border border-border p-4"
@@ -718,6 +889,32 @@ export default function ReportsPage() {
                   ))
                 )}
               </div>
+              {activityTotal > 0 && (
+                <div className="mt-4 flex items-center justify-between">
+                  <p className="text-sm text-muted-foreground">
+                    Showing {(activityPageSafe - 1) * PAGE_SIZE + 1} to{" "}
+                    {Math.min(activityPageSafe * PAGE_SIZE, activityTotal)} of {activityTotal} users
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={activityPageSafe === 1}
+                      onClick={() => setActivityPage(activityPageSafe - 1)}
+                    >
+                      Previous
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={activityPageSafe >= activityTotalPages}
+                      onClick={() => setActivityPage(activityPageSafe + 1)}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
