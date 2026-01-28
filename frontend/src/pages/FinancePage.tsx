@@ -1,115 +1,97 @@
+
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { PageHeader } from "components/ui/page-header";
-import { StatCard } from "components/ui/stat-card";
-import { Card, CardContent, CardHeader, CardTitle } from "components/ui/card";
-import { Button } from "components/ui/button";
-import { Input } from "components/ui/input";
-import { Label } from "components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "components/ui/tabs";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "components/ui/table";
-import { Badge } from "components/ui/badge";
-import {
-  DollarSign,
-  TrendingUp,
-  TrendingDown,
-  Package,
-  Wallet,
-  BarChart3,
-  Edit,
-  Check,
-  X,
-  AlertTriangle,
-} from "lucide-react";
-import { apiRequest } from "services/api";
 import { format } from "date-fns";
-import { useSystemCopy, useSystemMode } from "lib/system-mode";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from "recharts";
-import type { TooltipProps } from "recharts";
+import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
+import { Button } from "../components/ui/button";
+import { Label } from "../components/ui/label";
+import { Input } from "../components/ui/input";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "../components/ui/select";
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "../components/ui/table";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/ui/tabs";
+import { Badge } from "../components/ui/badge";
+import { StatCard } from "../components/ui/stat-card";
+import { PageHeader } from "../components/ui/page-header";
+import { AlertTriangle, DollarSign, Wallet, TrendingUp, TrendingDown, Package, BarChart3, Check, X, Edit } from "lucide-react";
+import { apiRequest } from "../services/api";
+import { useSystemCopy, useSystemMode } from "../lib/system-mode";
+import { Tooltip, Legend, ResponsiveContainer, BarChart, CartesianGrid, XAxis, YAxis, Bar } from "recharts";
+import { qk } from "lib/query-keys";
+import { syncUnitTotal } from "lib/money-sync";
 
+// Dashboard data types
+type DashboardTotals = {
+  totalReceivedQty: number;
+  totalReceivedCost: number;
+  avgReceiveCost: number;
+  totalIssuedQty: number;
+  totalIssuedRevenue: number;
+  avgIssuePrice: number;
+  estimatedProfit: number;
+  profitMargin: number;
+  inventoryValue?: number;
+  estimatedInventoryValue?: number;
+  outstandingInventoryQty?: number;
+};
+type DashboardByItemType = {
+  itemType: { id: number; name: string; code: string };
+  receivedQty: number;
+  receivedCost: number;
+  issuedQty: number;
+  issuedRevenue: number;
+  balance: number;
+  avgUnitCost: number;
+  avgUnitPrice: number;
+  profit: number;
+  inventoryValue: number;
+};
+type DashboardChartData = {
+  date?: string;
+  receivedCost?: number;
+  issuedRevenue?: number;
+  profit?: number;
+  month?: string;
+  cost?: number;
+  revenue?: number;
+};
+type DashboardRecent = {
+  receipts: Array<{
+    id: number;
+    type: "RECEIVE";
+    itemType: { id: number; name: string; code: string };
+    status: "POSTED" | "REVERSED";
+    qty: number;
+    unitCost: number | null;
+    totalCost: number | null;
+    calculatedTotalCost?: number;
+    createdAt: string;
+  }>;
+  issues: Array<{
+    id: number;
+    type: "ISSUE";
+    itemType: { id: number; name: string; code: string };
+    status: "POSTED" | "REVERSED";
+    qty: number;
+    unitPrice: number | null;
+    totalPrice: number | null;
+    calculatedTotalPrice?: number;
+    createdAt: string;
+  }>;
+};
+type DashboardData = {
+  totals: DashboardTotals;
+  byItemType: DashboardByItemType[];
+  chartData: DashboardChartData[];
+  recent: DashboardRecent;
+};
+
+// Option constant for item type filter
 const ALL_ITEM_OPTION = "ALL_ITEM_TYPES";
 
-type FinanceData = {
-  totals: {
-    totalReceivedQty: number;
-    totalReceivedCost: number;
-    avgReceiveCost: number;
-    totalIssuedQty: number;
-    totalIssuedRevenue: number;
-    avgIssuePrice: number;
-    estimatedProfit: number;
-    profitMargin: number;
-    outstandingInventoryQty: number;
-    estimatedInventoryValue: number;
-  };
-  byItemType: Array<{
-    itemType: { id: number; name: string; code: string };
-    receivedQty: number;
-    receivedCost: number;
-    issuedQty: number;
-    issuedRevenue: number;
-    balance: number;
-    avgUnitCost: number;
-    avgUnitPrice: number;
-    profit: number;
-    inventoryValue: number;
-  }>;
-  chartData: Array<{
-    month: string;
-    cost: number;
-    revenue: number;
-    profit: number;
-  }>;
-  recent: {
-    receipts: Array<{
-      id: number;
-      type: "RECEIVE";
-      itemType: { id: number; name: string; code: string };
-      status: "COMPLETED" | "REVERSED";
-      qty: number;
-      unitCost: number | null;
-      totalCost: number | null;
-      calculatedTotalCost: number;
-      createdAt: string;
-    }>;
-    issues: Array<{
-      id: number;
-      type: "ISSUE";
-      itemType: { id: number; name: string; code: string };
-      status: "COMPLETED" | "REVERSED";
-      qty: number;
-      unitPrice: number | null;
-      totalPrice: number | null;
-      calculatedTotalPrice: number;
-      createdAt: string;
-    }>;
-  };
-};
+// ...existing code...
+// Renamed all finance references to dashboard
 
 type ItemType = {
   id: number;
@@ -123,6 +105,7 @@ export default function DashboardPage() {
   const hasAccess = true;
   const copy = useSystemCopy();
   const { mode } = useSystemMode();
+  const isInventoryMode = mode === "INVENTORY";
 
   const [dateRange, setDateRange] = useState({
     startDate: "",
@@ -145,9 +128,21 @@ export default function DashboardPage() {
     totalValue: string;
   } | null>(null);
 
+  const dashboardFilters = useMemo(
+    () => ({
+      startDate: dateRange.startDate || "",
+      endDate: dateRange.endDate || "",
+      itemTypeId:
+        itemTypeFilter && itemTypeFilter !== ALL_ITEM_OPTION
+          ? itemTypeFilter
+          : "",
+    }),
+    [dateRange.startDate, dateRange.endDate, itemTypeFilter],
+  );
+
   // Fetch item types for filter
   const { data: itemTypes = [] } = useQuery<ItemType[]>({
-    queryKey: ["item-types", mode],
+    queryKey: qk.itemTypes(mode),
     queryFn: async () => {
       const response = await apiRequest<{ itemTypes: ItemType[] }>(
         "/api/item-types",
@@ -168,17 +163,21 @@ export default function DashboardPage() {
     return params.toString();
   }, [dateRange, itemTypeFilter]);
 
-  // Fetch finance data
-  const { data: financeData, isLoading } = useQuery({
-    queryKey: ["finance-data", queryParams, mode],
+  // Fetch dashboard data
+  const { data: financeData, isLoading } = useQuery<DashboardData>({
+    queryKey: qk.dashboard(mode, dashboardFilters),
     queryFn: () =>
-      apiRequest<FinanceData>(`/api/reports/finance?${queryParams}`),
+      apiRequest<DashboardData>(`/api/reports/dashboard?${queryParams}`),
     enabled: hasAccess,
     refetchInterval: 30000, // Refresh every 30 seconds for real-time view
   });
 
   useEffect(() => {
     setItemTypeFilter("");
+  }, [mode]);
+
+  useEffect(() => {
+    setEditingTransaction(null);
   }, [mode]);
 
   useEffect(() => {
@@ -220,13 +219,20 @@ export default function DashboardPage() {
         body: JSON.stringify(payload),
       });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["finance-data"] });
-      queryClient.invalidateQueries({ queryKey: ["transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["stock-balance"] });
-      queryClient.invalidateQueries({ queryKey: ["issues-report"] });
-      queryClient.invalidateQueries({ queryKey: ["receipts-report"] });
-      queryClient.invalidateQueries({ queryKey: ["user-activity-report"] });
+    onSuccess: (updated: any) => {
+      queryClient.invalidateQueries({ queryKey: ["reports", mode] });
+      queryClient.invalidateQueries({ queryKey: ["transactions", mode] });
+      if (updated?.id != null) {
+        queryClient.invalidateQueries({
+          queryKey: qk.transaction(mode, updated.id),
+        });
+      }
+      const itemTypeId = updated?.itemType?.id ?? updated?.itemTypeId;
+      if (itemTypeId != null) {
+        queryClient.invalidateQueries({
+          queryKey: qk.batches(mode, itemTypeId),
+        });
+      }
       setEditingTransaction(null);
     },
   });
@@ -248,16 +254,36 @@ export default function DashboardPage() {
   const formatMoneyInput = (value: number | null) =>
     value == null ? "" : value.toFixed(2);
 
-  const syncTotalFromUnit = (unitValue: string, qty: number) => {
-    const unit = parseNumber(unitValue);
-    if (unit == null || qty <= 0) return "";
-    return formatMoneyInput(unit * qty);
-  };
+  const syncMoneyInputs = ({
+    qty,
+    unitValue,
+    totalValue,
+    changedField,
+  }: {
+    qty: number;
+    unitValue: string;
+    totalValue: string;
+    changedField: "unit" | "total" | "qty";
+  }) => {
+    const { unit, total } = syncUnitTotal({
+      qty,
+      unit: parseNumber(unitValue),
+      total: parseNumber(totalValue),
+      changedField,
+    });
 
-  const syncUnitFromTotal = (totalValue: string, qty: number) => {
-    const total = parseNumber(totalValue);
-    if (total == null || qty <= 0) return "";
-    return formatMoneyInput(total / qty);
+    const nextUnit = unit != null ? formatMoneyInput(unit) : "";
+    const nextTotal = total != null ? formatMoneyInput(total) : "";
+
+    if (changedField === "unit") {
+      return { unitValue, totalValue: nextTotal };
+    }
+
+    if (changedField === "total") {
+      return { unitValue: nextUnit, totalValue };
+    }
+
+    return { unitValue: nextUnit, totalValue: nextTotal };
   };
 
   const formatNumber = (value: number) => {
@@ -268,63 +294,76 @@ export default function DashboardPage() {
     return `${value.toFixed(1)}%`;
   };
 
-  const formatMonthValue = (value: string | number | null | undefined) => {
+  const formatDateLabel = (value: string | number | null | undefined) => {
     if (value == null) return "Unknown";
-    const monthStr = String(value);
-    const [year, month] = monthStr.split("-");
-    const yearNum = parseInt(year, 10);
-    const monthNum = parseInt(month, 10);
-    if (
-      isNaN(yearNum) ||
-      isNaN(monthNum) ||
-      monthNum < 1 ||
-      monthNum > 12
-    ) {
+    const raw = String(value);
+    if (/^\d{4}-\d{2}$/.test(raw)) {
+      const [year, month] = raw.split("-");
+      const yearNum = Number(year);
+      const monthNum = Number(month);
+      if (!Number.isFinite(yearNum) || !Number.isFinite(monthNum)) {
+        return "Unknown";
+      }
+      const date = new Date(yearNum, monthNum - 1, 1);
+      return isNaN(date.getTime()) ? "Unknown" : format(date, "MMM yyyy");
+    }
+    const parsed = new Date(raw);
+    if (isNaN(parsed.getTime())) {
       return "Unknown";
     }
-    const date = new Date(yearNum, monthNum - 1);
-    if (isNaN(date.getTime())) {
-      return "Unknown";
-    }
-    return format(date, "MMM yyyy");
+    return format(parsed, "MMM d, yyyy");
   };
 
-  const formatMonth: TooltipProps<number, string>["labelFormatter"] = (
-    label,
-  ) => formatMonthValue(label);
-
-  const tooltipFormatter: TooltipProps<number, string>["formatter"] = (
-    value,
-  ) => {
+  // Recharts expects (value, name, props) => ReactNode for formatter, and (label, payload) => ReactNode for labelFormatter
+  const tooltipFormatter = (value: string | number | undefined) => {
     const numericValue =
       typeof value === "number"
         ? value
-        : Number.parseFloat(value != null ? String(value) : "0");
-
-    if (!Number.isFinite(numericValue)) {
-      return formatCurrency(0);
-    }
-
+        : typeof value === "string"
+        ? parseFloat(value)
+        : 0;
     return formatCurrency(numericValue);
   };
+
+  const rechartsTooltipFormatter = (value: string | number | undefined) => tooltipFormatter(value);
+  const rechartsLabelFormatter = (label: any) => formatDateLabel(label);
 
   const totals = financeData?.totals;
   const byItemType = financeData?.byItemType || [];
   const chartData = financeData?.chartData || [];
+  const normalizedChartData = chartData.map((item: DashboardChartData) => ({
+    date: item.date ?? item.month ?? "",
+    receivedCost: item.receivedCost ?? item.cost ?? 0,
+    issuedRevenue: item.issuedRevenue ?? item.revenue ?? 0,
+    profit: item.profit ?? 0,
+  }));
+  const totalInventoryQty =
+    totals?.outstandingInventoryQty ??
+    byItemType.reduce((sum, item) => sum + (item.balance || 0), 0);
+  const totalInventoryValue =
+    totals?.inventoryValue ??
+    totals?.estimatedInventoryValue ??
+    byItemType.reduce((sum, item) => sum + (item.inventoryValue || 0), 0);
   const recentReceipts = financeData?.recent?.receipts || [];
   const recentIssues = financeData?.recent?.issues || [];
+  const showRevenue = !isInventoryMode;
+  const summaryGridClass = showRevenue
+    ? "grid gap-4 md:grid-cols-2 lg:grid-cols-4"
+    : "grid gap-4 md:grid-cols-2 lg:grid-cols-3";
+  const unitValueLabel = isInventoryMode ? "Unit Cost" : "Unit Value";
+  const totalValueLabel = isInventoryMode ? "Total Cost" : "Total Value";
 
   // Combine and sort recent transactions
   const recentTransactions = [
-    ...recentReceipts.map((r) => ({ ...r, type: "RECEIVE" as const })),
-    ...recentIssues.map((i) => ({ ...i, type: "ISSUE" as const })),
+    ...recentReceipts.map((r: typeof recentReceipts[number]) => ({ ...r, type: "RECEIVE" as const })),
+    ...recentIssues.map((i: typeof recentIssues[number]) => ({ ...i, type: "ISSUE" as const })),
   ].sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   );
 
   const normalizedByItemTypeSearch = byItemTypeSearch.trim().toLowerCase();
   const filteredByItemType = normalizedByItemTypeSearch
-    ? byItemType.filter((item) => {
+    ? byItemType.filter((item: DashboardByItemType) => {
         const haystack = [
           item.itemType?.name,
           item.itemType?.code,
@@ -359,8 +398,7 @@ export default function DashboardPage() {
           txn.itemType?.name,
           txn.itemType?.code,
           txn.qty,
-          unitValue,
-          totalValue,
+          ...(isInventoryMode && txn.type === "ISSUE" ? [] : [unitValue, totalValue]),
           txn.createdAt,
         ]
           .filter(Boolean)
@@ -491,8 +529,8 @@ export default function DashboardPage() {
 
       {/* Summary Stats */}
       {isLoading ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {[...Array(4)].map((_, i) => (
+        <div className={summaryGridClass}>
+          {[...Array(showRevenue ? 4 : 3)].map((_, i) => (
             <Card key={i} className="animate-pulse">
               <CardContent className="pt-6">
                 <div className="h-4 bg-muted/60 rounded w-1/2 mb-2"></div>
@@ -502,37 +540,48 @@ export default function DashboardPage() {
           ))}
         </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className={summaryGridClass}>
           <StatCard
             title="Total Cost (Purchases)"
             value={formatCurrency(totals?.totalReceivedCost)}
             description={`${formatNumber(totals?.totalReceivedQty || 0)} ${copy.unitNounPlural} received`}
             icon={DollarSign}
           />
-          <StatCard
-            title="Total Revenue (Sales)"
-            value={formatCurrency(totals?.totalIssuedRevenue)}
-            description={`${formatNumber(totals?.totalIssuedQty || 0)} ${copy.unitNounPlural} issued`}
-            icon={Wallet}
-          />
-          <StatCard
-            title="Estimated Profit"
-            value={formatCurrency(totals?.estimatedProfit)}
-            description={`${formatPercent(totals?.profitMargin || 0)} margin`}
-            icon={totals?.estimatedProfit && totals.estimatedProfit >= 0 ? TrendingUp : TrendingDown}
-            trend={
-              totals?.profitMargin !== undefined
-                ? {
-                    value: `${totals.profitMargin.toFixed(1)}% margin`,
-                    isPositive: totals.profitMargin >= 0,
-                  }
-                : undefined
-            }
-          />
+          {showRevenue ? (
+            <>
+              <StatCard
+                title="Total Revenue (Sales)"
+                value={formatCurrency(totals?.totalIssuedRevenue)}
+                description={`${formatNumber(totals?.totalIssuedQty || 0)} ${copy.unitNounPlural} issued`}
+                icon={Wallet}
+              />
+              <StatCard
+                title="Estimated Profit"
+                value={formatCurrency(totals?.estimatedProfit)}
+                description={`${formatPercent(totals?.profitMargin || 0)} margin`}
+                icon={totals?.estimatedProfit && totals.estimatedProfit >= 0 ? TrendingUp : TrendingDown}
+                trend={
+                  totals?.profitMargin !== undefined
+                    ? {
+                        value: `${totals.profitMargin.toFixed(1)}% margin`,
+                        isPositive: totals.profitMargin >= 0,
+                      }
+                    : undefined
+                }
+              />
+            </>
+          ) : (
+            <StatCard
+              title={`Total Issued ${copy.unitNounPlural}`}
+              value={formatNumber(totals?.totalIssuedQty || 0)}
+              description={`Across ${copy.itemTypePlural.toLowerCase()}`}
+              icon={BarChart3}
+            />
+          )}
           <StatCard
             title="Inventory Value"
-            value={formatCurrency(totals?.estimatedInventoryValue)}
-            description={`${formatNumber(totals?.outstandingInventoryQty || 0)} ${copy.unitNounPlural} in stock`}
+            value={formatCurrency(totalInventoryValue)}
+            description={`${formatNumber(totalInventoryQty || 0)} ${copy.unitNounPlural} in stock`}
             icon={Package}
           />
         </div>
@@ -543,7 +592,7 @@ export default function DashboardPage() {
         <TabsList>
           <TabsTrigger value="chart">
             <BarChart3 className="h-4 w-4 mr-2" />
-            Profit Chart
+            {showRevenue ? "Profit Chart" : "Cost Chart"}
           </TabsTrigger>
           <TabsTrigger value="by-card-type">
             By {copy.itemTypeLabel}
@@ -555,20 +604,24 @@ export default function DashboardPage() {
         <TabsContent value="chart">
           <Card>
             <CardHeader>
-              <CardTitle>Cost vs Revenue vs Profit (All Time)</CardTitle>
+              <CardTitle>
+                {showRevenue
+                  ? "Cost vs Revenue vs Profit (All Time)"
+                  : "Cost (All Time)"}
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              {chartData.length === 0 ? (
+              {normalizedChartData.length === 0 ? (
                 <div className="flex items-center justify-center h-[400px] text-muted-foreground">
                   No transaction data available for chart
                 </div>
               ) : (
                 <ResponsiveContainer width="100%" height={400}>
-                  <BarChart data={chartData}>
+                  <BarChart data={normalizedChartData}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis
-                      dataKey="month"
-                      tickFormatter={formatMonthValue}
+                      dataKey="date"
+                      tickFormatter={formatDateLabel}
                       fontSize={12}
                     />
                     <YAxis
@@ -578,13 +631,19 @@ export default function DashboardPage() {
                       fontSize={12}
                     />
                     <Tooltip
-                      formatter={tooltipFormatter}
-                      labelFormatter={formatMonth}
+                      formatter={rechartsTooltipFormatter}
+                      labelFormatter={rechartsLabelFormatter}
                     />
-                    <Legend />
-                    <Bar dataKey="cost" name="Cost" fill="#ef4444" />
-                    <Bar dataKey="revenue" name="Revenue" fill="#22c55e" />
-                    <Bar dataKey="profit" name="Profit" fill="#3b82f6" />
+                    {showRevenue && (
+                      <Legend />
+                    )}
+                    <Bar dataKey="receivedCost" name="Cost" fill="#ef4444" />
+                    {showRevenue && (
+                      <>
+                        <Bar dataKey="issuedRevenue" name="Revenue" fill="#22c55e" />
+                        <Bar dataKey="profit" name="Profit" fill="#3b82f6" />
+                      </>
+                    )}
                   </BarChart>
                 </ResponsiveContainer>
               )}
@@ -597,7 +656,8 @@ export default function DashboardPage() {
           <Card>
             <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <CardTitle>
-                Financial Summary by {copy.itemTypeLabel}
+                {showRevenue ? "Financial Summary" : "Inventory Summary"} by{" "}
+                {copy.itemTypeLabel}
               </CardTitle>
               <Input
                 value={byItemTypeSearch}
@@ -615,23 +675,30 @@ export default function DashboardPage() {
                     <TableHead className="text-right">Total Cost</TableHead>
                     <TableHead className="text-right">Avg Unit Cost</TableHead>
                     <TableHead className="text-right">Issued Qty</TableHead>
-                    <TableHead className="text-right">Total Revenue</TableHead>
-                    <TableHead className="text-right">Avg Unit Price</TableHead>
-                    <TableHead className="text-right">Profit</TableHead>
+                    {showRevenue && (
+                      <>
+                        <TableHead className="text-right">Total Revenue</TableHead>
+                        <TableHead className="text-right">Avg Unit Price</TableHead>
+                        <TableHead className="text-right">Profit</TableHead>
+                      </>
+                    )}
                     <TableHead className="text-right">In Stock</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {totalByItemTypes === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={9} className="text-center py-8">
+                      <TableCell
+                        colSpan={showRevenue ? 9 : 6}
+                        className="text-center py-8"
+                      >
                         {normalizedByItemTypeSearch
                           ? "No matching results"
                           : "No data available"}
                       </TableCell>
                     </TableRow>
                   ) : (
-                    pagedByItemType.map((item) => (
+                    pagedByItemType.map((item: DashboardByItemType) => (
                       <TableRow key={item.itemType.id}>
                         <TableCell className="font-medium">
                           {item.itemType.name}
@@ -651,21 +718,25 @@ export default function DashboardPage() {
                         <TableCell className="text-right">
                           {formatNumber(item.issuedQty)}
                         </TableCell>
-                        <TableCell className="text-right">
-                          {formatCurrency(item.issuedRevenue)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {formatCurrency(item.avgUnitPrice)}
-                        </TableCell>
-                        <TableCell
-                          className={`text-right font-medium ${
-                            item.profit >= 0
-                              ? "text-emerald-600 dark:text-emerald-400"
-                              : "text-red-600 dark:text-red-400"
-                          }`}
-                        >
-                          {formatCurrency(item.profit)}
-                        </TableCell>
+                        {showRevenue && (
+                          <>
+                            <TableCell className="text-right">
+                              {formatCurrency(item.issuedRevenue)}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {formatCurrency(item.avgUnitPrice)}
+                            </TableCell>
+                            <TableCell
+                              className={`text-right font-medium ${
+                                item.profit >= 0
+                                  ? "text-emerald-600 dark:text-emerald-400"
+                                  : "text-red-600 dark:text-red-400"
+                              }`}
+                            >
+                              {formatCurrency(item.profit)}
+                            </TableCell>
+                          </>
+                        )}
                         <TableCell className="text-right">
                           {formatNumber(item.balance)}
                         </TableCell>
@@ -728,8 +799,8 @@ export default function DashboardPage() {
                     <TableHead>Type</TableHead>
                     <TableHead>{copy.itemTypeLabel}</TableHead>
                     <TableHead className="text-right">Qty</TableHead>
-                    <TableHead className="text-right">Unit Value</TableHead>
-                    <TableHead className="text-right">Total Value</TableHead>
+                    <TableHead className="text-right">{unitValueLabel}</TableHead>
+                    <TableHead className="text-right">{totalValueLabel}</TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead className="text-center">Actions</TableHead>
                   </TableRow>
@@ -746,6 +817,7 @@ export default function DashboardPage() {
                   ) : (
                     pagedTransactions.map((txn) => {
                       const isEditing = editingTransaction?.id === txn.id;
+                      const isPosted = txn.status === "POSTED";
                       const isReversed = txn.status === "REVERSED";
                       const unitValue =
                         txn.type === "RECEIVE"
@@ -753,8 +825,15 @@ export default function DashboardPage() {
                           : (txn as any).unitPrice;
                       const totalValue =
                         txn.type === "RECEIVE"
-                          ? (txn as any).calculatedTotalCost
-                          : (txn as any).calculatedTotalPrice;
+                          ? (txn as any).calculatedTotalCost ??
+                            (txn as any).totalCost ??
+                            (unitValue != null ? unitValue * txn.qty : null)
+                          : (txn as any).calculatedTotalPrice ??
+                            (txn as any).totalPrice ??
+                            (unitValue != null ? unitValue * txn.qty : null);
+                      const canEdit =
+                        isPosted && (!isInventoryMode || txn.type === "RECEIVE");
+                      const canShowValue = !isInventoryMode || txn.type === "RECEIVE";
                       const currentQty = isEditing
                         ? parseNumber(editingTransaction.qty) || 0
                         : txn.qty;
@@ -777,30 +856,23 @@ export default function DashboardPage() {
                               <Input
                                 type="number"
                                 min="1"
-                                value={editingTransaction.qty}
+                                value={editingTransaction?.qty ?? ""}
                                 onChange={(e) =>
                                   setEditingTransaction((prev) => {
                                     if (!prev) return null;
                                     const nextQtyValue = e.target.value;
                                     const nextQty = parseNumber(nextQtyValue) || 0;
-                                    let nextUnit = prev.unitValue;
-                                    let nextTotal = prev.totalValue;
-                                    if (prev.unitValue) {
-                                      nextTotal = syncTotalFromUnit(
-                                        prev.unitValue,
-                                        nextQty,
-                                      );
-                                    } else if (prev.totalValue) {
-                                      nextUnit = syncUnitFromTotal(
-                                        prev.totalValue,
-                                        nextQty,
-                                      );
-                                    }
+                                    const synced = syncMoneyInputs({
+                                      qty: nextQty,
+                                      unitValue: prev.unitValue,
+                                      totalValue: prev.totalValue,
+                                      changedField: "qty",
+                                    });
                                     return {
                                       ...prev,
                                       qty: nextQtyValue,
-                                      unitValue: nextUnit,
-                                      totalValue: nextTotal,
+                                      unitValue: synced.unitValue,
+                                      totalValue: synced.totalValue,
                                     };
                                   })
                                 }
@@ -816,17 +888,18 @@ export default function DashboardPage() {
                                 type="number"
                                 step="0.01"
                                 min="0"
-                                value={editingTransaction.unitValue}
+                                value={editingTransaction?.unitValue ?? ""}
                                 onChange={(e) =>
                                   setEditingTransaction((prev) =>
                                     prev
                                       ? {
                                           ...prev,
-                                          unitValue: e.target.value,
-                                          totalValue: syncTotalFromUnit(
-                                            e.target.value,
-                                            currentQty,
-                                          ),
+                                          ...syncMoneyInputs({
+                                            qty: currentQty,
+                                            unitValue: e.target.value,
+                                            totalValue: prev.totalValue,
+                                            changedField: "unit",
+                                          }),
                                         }
                                       : null
                                   )
@@ -834,7 +907,7 @@ export default function DashboardPage() {
                                 className="w-24 text-right"
                               />
                             ) : (
-                              formatCurrency(unitValue)
+                              canShowValue ? formatCurrency(unitValue) : "--"
                             )}
                           </TableCell>
                           <TableCell className="text-right">
@@ -843,17 +916,18 @@ export default function DashboardPage() {
                                 type="number"
                                 step="0.01"
                                 min="0"
-                                value={editingTransaction.totalValue}
+                                value={editingTransaction?.totalValue ?? ""}
                                 onChange={(e) =>
                                   setEditingTransaction((prev) =>
                                     prev
                                       ? {
                                           ...prev,
-                                          totalValue: e.target.value,
-                                          unitValue: syncUnitFromTotal(
-                                            e.target.value,
-                                            currentQty,
-                                          ),
+                                          ...syncMoneyInputs({
+                                            qty: currentQty,
+                                            unitValue: prev.unitValue,
+                                            totalValue: e.target.value,
+                                            changedField: "total",
+                                          }),
                                         }
                                       : null
                                   )
@@ -862,7 +936,7 @@ export default function DashboardPage() {
                                 placeholder="Optional"
                               />
                             ) : (
-                              formatCurrency(totalValue)
+                              canShowValue ? formatCurrency(totalValue) : "--"
                             )}
                           </TableCell>
                           <TableCell>
@@ -876,11 +950,11 @@ export default function DashboardPage() {
                                   variant="ghost"
                                   onClick={() =>
                                     updateMutation.mutate({
-                                      id: editingTransaction.id,
-                                      type: editingTransaction.type,
-                                      qty: editingTransaction.qty,
-                                      unitValue: editingTransaction.unitValue,
-                                      totalValue: editingTransaction.totalValue,
+                                      id: editingTransaction?.id ?? 0,
+                                      type: editingTransaction?.type ?? "RECEIVE",
+                                      qty: editingTransaction?.qty ?? "",
+                                      unitValue: editingTransaction?.unitValue ?? "",
+                                      totalValue: editingTransaction?.totalValue ?? "",
                                     })
                                   }
                                   disabled={updateMutation.isPending}
@@ -899,9 +973,9 @@ export default function DashboardPage() {
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                disabled={isReversed}
+                                disabled={isReversed || !canEdit}
                                 onClick={() => {
-                                  if (isReversed) return;
+                                  if (isReversed || !canEdit) return;
                                   const rawUnit =
                                     txn.type === "RECEIVE"
                                       ? (txn as any).unitCost
@@ -911,21 +985,34 @@ export default function DashboardPage() {
                                       ? (txn as any).totalCost
                                       : (txn as any).totalPrice;
                                   const initialQty = String(txn.qty);
+                                  const initialSync = syncUnitTotal({
+                                    qty: txn.qty,
+                                    unit: rawUnit,
+                                    total: rawTotal,
+                                    changedField:
+                                      rawTotal != null
+                                        ? "total"
+                                        : rawUnit != null
+                                          ? "unit"
+                                          : "qty",
+                                  });
                                   const initialTotal =
-                                    rawTotal !== null
+                                    rawTotal != null
                                       ? String(rawTotal)
-                                      : rawUnit !== null
-                                        ? syncTotalFromUnit(
-                                            String(rawUnit),
-                                            txn.qty,
-                                          )
+                                      : initialSync.total != null
+                                        ? formatMoneyInput(initialSync.total)
+                                        : "";
+                                  const initialUnit =
+                                    rawUnit != null
+                                      ? String(rawUnit)
+                                      : initialSync.unit != null
+                                        ? formatMoneyInput(initialSync.unit)
                                         : "";
                                   setEditingTransaction({
                                     id: txn.id,
                                     type: txn.type,
                                     qty: initialQty,
-                                    unitValue:
-                                      rawUnit !== null ? String(rawUnit) : "",
+                                    unitValue: initialUnit,
                                     totalValue: initialTotal,
                                   });
                                 }}

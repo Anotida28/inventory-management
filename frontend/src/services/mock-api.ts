@@ -1,6 +1,8 @@
-type UserRole = "ADMIN" | "CLERK" | "AUDITOR" | "FINANCE";
-type TransactionType = "RECEIVE" | "ISSUE" | "REVERSAL";
-type TransactionStatus = "COMPLETED" | "REVERSED";
+import { syncUnitTotal } from "lib/money-sync";
+
+type UserRole = "ADMIN" | "CLERK" | "AUDITOR" | "DASHBOARD";
+type TransactionType = "RECEIVE" | "ISSUE" | "REVERSAL" | "ADJUSTMENT";
+type TransactionStatus = "POSTED" | "REVERSED";
 type IssuedToType = "BRANCH" | "PERSON";
 type SystemMode = "CARDS" | "INVENTORY";
 
@@ -130,7 +132,7 @@ const state = {
       lastName: "Toure",
       email: "ibrahim.toure@omari.internal",
       username: "itoure",
-      role: "FINANCE",
+      role: "DASHBOARD",
       isActive: true,
       lastLoginAt: daysAgo(2),
     },
@@ -197,7 +199,7 @@ const state = {
           qty: 1200,
           createdAt: daysAgo(18),
           createdById: 1,
-          status: "COMPLETED",
+          status: "POSTED",
           batchId: 1,
           unitCost: 2.25,
           totalCost: 2700,
@@ -210,7 +212,7 @@ const state = {
           qty: 320,
           createdAt: daysAgo(10),
           createdById: 2,
-          status: "COMPLETED",
+          status: "POSTED",
           issuedToType: "BRANCH",
           issuedToName: "Main Branch",
           batchId: 1,
@@ -225,7 +227,7 @@ const state = {
           qty: 800,
           createdAt: daysAgo(25),
           createdById: 1,
-          status: "COMPLETED",
+          status: "POSTED",
           batchId: 2,
           unitCost: 3.1,
           totalCost: 2480,
@@ -238,7 +240,7 @@ const state = {
           qty: 150,
           createdAt: daysAgo(3),
           createdById: 3,
-          status: "COMPLETED",
+          status: "POSTED",
           issuedToType: "PERSON",
           issuedToName: "Regional Manager",
           batchId: 2,
@@ -253,7 +255,7 @@ const state = {
           qty: 400,
           createdAt: daysAgo(40),
           createdById: 1,
-          status: "COMPLETED",
+          status: "POSTED",
           batchId: 3,
           unitCost: 2.9,
           totalCost: 1160,
@@ -266,7 +268,7 @@ const state = {
           qty: 120,
           createdAt: daysAgo(15),
           createdById: 2,
-          status: "COMPLETED",
+          status: "POSTED",
           issuedToType: "BRANCH",
           issuedToName: "Enterprise Desk",
           batchId: 3,
@@ -358,7 +360,7 @@ const state = {
           qty: 40,
           createdAt: daysAgo(30),
           createdById: 1,
-          status: "COMPLETED",
+          status: "POSTED",
           batchId: 1,
           unitCost: 85,
           totalCost: 3400,
@@ -371,12 +373,12 @@ const state = {
           qty: 12,
           createdAt: daysAgo(14),
           createdById: 2,
-          status: "COMPLETED",
+          status: "POSTED",
           issuedToType: "BRANCH",
           issuedToName: "Bulawayo Branch",
           batchId: 1,
-          unitPrice: 120,
-          totalPrice: 1440,
+          unitPrice: null,
+          totalPrice: null,
           notes: "Front office setup",
         },
         {
@@ -386,7 +388,7 @@ const state = {
           qty: 100,
           createdAt: daysAgo(45),
           createdById: 1,
-          status: "COMPLETED",
+          status: "POSTED",
           batchId: 2,
           unitCost: 45,
           totalCost: 4500,
@@ -399,12 +401,12 @@ const state = {
           qty: 60,
           createdAt: daysAgo(20),
           createdById: 3,
-          status: "COMPLETED",
+          status: "POSTED",
           issuedToType: "BRANCH",
           issuedToName: "Harare HQ",
           batchId: 2,
-          unitPrice: 65,
-          totalPrice: 3900,
+          unitPrice: null,
+          totalPrice: null,
           notes: "Operations floor seating",
         },
         {
@@ -414,7 +416,7 @@ const state = {
           qty: 25,
           createdAt: daysAgo(20),
           createdById: 1,
-          status: "COMPLETED",
+          status: "POSTED",
           batchId: 3,
           unitCost: 220,
           totalCost: 5500,
@@ -427,12 +429,12 @@ const state = {
           qty: 10,
           createdAt: daysAgo(7),
           createdById: 2,
-          status: "COMPLETED",
+          status: "POSTED",
           issuedToType: "BRANCH",
           issuedToName: "Mutare Branch",
           batchId: 3,
-          unitPrice: 310,
-          totalPrice: 3100,
+          unitPrice: null,
+          totalPrice: null,
           notes: "POS rollout phase 1",
         },
         {
@@ -442,7 +444,7 @@ const state = {
           qty: 60,
           createdAt: daysAgo(12),
           createdById: 1,
-          status: "COMPLETED",
+          status: "POSTED",
           batchId: 4,
           unitCost: 95,
           totalCost: 5700,
@@ -455,12 +457,12 @@ const state = {
           qty: 20,
           createdAt: daysAgo(5),
           createdById: 3,
-          status: "COMPLETED",
+          status: "POSTED",
           issuedToType: "BRANCH",
           issuedToName: "Gweru Branch",
           batchId: 4,
-          unitPrice: 135,
-          totalPrice: 2700,
+          unitPrice: null,
+          totalPrice: null,
           notes: "Branch workstation upgrade",
         },
       ],
@@ -511,6 +513,7 @@ const hydrateTransaction = (transaction: Transaction) => {
           id: createdBy.id,
           firstName: createdBy.firstName,
           lastName: createdBy.lastName,
+          name: `${createdBy.firstName} ${createdBy.lastName}`.trim(),
           email: createdBy.email,
           role: createdBy.role,
         }
@@ -655,10 +658,6 @@ export async function handleMockApiRequest(
   const body = parseJsonBody(options) || {};
   const activeState = getActiveState();
 
-  if (path === "/api/health") {
-    return { status: "ok", mode: "frontend-only" };
-  }
-
   if (path === "/api/item-types" && method === "GET") {
     const includeInactive = params.get("includeInactive") === "true";
     const itemTypes = includeInactive
@@ -679,90 +678,23 @@ export async function handleMockApiRequest(
     return newItemType;
   }
 
-  const itemTypeMatch = path.match(/^\/api\/item-types\/(\d+)$/);
-  if (itemTypeMatch && method === "PATCH") {
-    const id = Number(itemTypeMatch[1]);
-    const itemType = requireItemType(id);
-    itemType.name = body.name ? String(body.name) : itemType.name;
-    itemType.code = body.code ? String(body.code) : itemType.code;
-    itemType.description =
-      body.description !== undefined ? String(body.description || "") : itemType.description;
-    if (typeof body.isActive === "boolean") {
-      itemType.isActive = body.isActive;
-    }
-    return itemType;
-  }
-
-  if (path === "/api/branches" && method === "GET") {
-    const includeInactive = params.get("includeInactive") === "true";
-    const branches = includeInactive
-      ? state.branches
-      : state.branches.filter((branch) => branch.isActive);
-    return { branches };
-  }
-
-  if (path === "/api/admin/users" && method === "GET") {
-    return { users: state.users };
-  }
-
-  if (path === "/api/admin/users" && method === "POST") {
-    const newUser: User = {
-      id: state.nextIds.user++,
-      firstName: String(body.firstName || "New"),
-      lastName: String(body.lastName || "User"),
-      email: String(body.email || "new.user@omari.internal"),
-      username: String(body.username || `user${state.nextIds.user}`),
-      role: (body.role as UserRole) || "CLERK",
-      isActive: true,
-      lastLoginAt: null,
-    };
-    state.users.push(newUser);
-    return newUser;
-  }
-
-  const userMatch = path.match(/^\/api\/admin\/users\/(\d+)$/);
-  if (userMatch && method === "PATCH") {
-    const id = Number(userMatch[1]);
-    const user = state.users.find((candidate) => candidate.id === id);
-    if (!user) throw new Error("User not found");
-    user.firstName = body.firstName ? String(body.firstName) : user.firstName;
-    user.lastName = body.lastName ? String(body.lastName) : user.lastName;
-    user.email = body.email ? String(body.email) : user.email;
-    user.username = body.username ? String(body.username) : user.username;
-    user.role = (body.role as UserRole) || user.role;
-    return user;
-  }
-
-  const userStatusMatch = path.match(/^\/api\/admin\/users\/(\d+)\/status$/);
-  if (userStatusMatch && method === "PATCH") {
-    const id = Number(userStatusMatch[1]);
-    const user = state.users.find((candidate) => candidate.id === id);
-    if (!user) throw new Error("User not found");
-    user.isActive = Boolean(body.isActive);
-    return user;
-  }
-
-  const userResetMatch = path.match(
-    /^\/api\/admin\/users\/(\d+)\/reset-password$/,
-  );
-  if (userResetMatch && method === "PATCH") {
-    const id = Number(userResetMatch[1]);
-    const user = state.users.find((candidate) => candidate.id === id);
-    if (!user) throw new Error("User not found");
-    return { success: true, id };
-  }
-
   if (path === "/api/reports/stock-balance" && method === "GET") {
     const balances = computeBalances();
-    return activeState.itemTypes.map((itemType) => {
+    const byItemType = activeState.itemTypes.map((itemType) => {
       const entry = balances.get(itemType.id);
       return {
-        id: itemType.id,
         itemType,
         balance: entry?.balance ?? 0,
         lastUpdatedAt: entry?.lastUpdatedAt ?? new Date().toISOString(),
       };
     });
+    return {
+      summary: {
+        totalCount: byItemType.length,
+        totalQty: byItemType.reduce((sum, item) => sum + item.balance, 0),
+      },
+      byItemType,
+    };
   }
 
   if (path === "/api/transactions" && method === "GET") {
@@ -802,8 +734,8 @@ export async function handleMockApiRequest(
     if (transaction.status === "REVERSED") {
       throw new Error("Reversed transactions cannot be edited");
     }
+    const isInventoryMode = getActiveMode() === "INVENTORY";
 
-    const roundMoney = (value: number) => Math.round(value * 100) / 100;
     const normalizeValue = (value: any) =>
       value === null || value === "" || value === undefined ? null : Number(value);
 
@@ -839,44 +771,55 @@ export async function handleMockApiRequest(
       const incomingUnit = body.unitCost !== undefined ? normalizeValue(body.unitCost) : undefined;
       const incomingTotal =
         body.totalCost !== undefined ? normalizeValue(body.totalCost) : undefined;
+      const changedField =
+        incomingUnit !== undefined
+          ? "unit"
+          : incomingTotal !== undefined
+            ? "total"
+            : body.qty !== undefined
+              ? "qty"
+              : null;
 
-      if (incomingUnit !== undefined) {
-        transaction.unitCost = incomingUnit;
-        transaction.totalCost =
-          incomingUnit != null && qty > 0 ? roundMoney(incomingUnit * qty) : null;
-      } else if (incomingTotal !== undefined) {
-        transaction.totalCost = incomingTotal;
-        transaction.unitCost =
-          incomingTotal != null && qty > 0 ? roundMoney(incomingTotal / qty) : null;
-      } else if (body.qty !== undefined) {
-        if (transaction.unitCost != null) {
-          transaction.totalCost = roundMoney(transaction.unitCost * qty);
-        } else if (transaction.totalCost != null) {
-          transaction.unitCost = roundMoney(transaction.totalCost / qty);
-        }
+      if (changedField) {
+        const { unit, total } = syncUnitTotal({
+          qty,
+          unit: incomingUnit !== undefined ? incomingUnit : transaction.unitCost,
+          total: incomingTotal !== undefined ? incomingTotal : transaction.totalCost,
+          changedField,
+        });
+        transaction.unitCost = unit;
+        transaction.totalCost = total;
       }
     }
 
     if (transaction.type === "ISSUE") {
+      if (isInventoryMode) {
+        transaction.unitPrice = null;
+        transaction.totalPrice = null;
+        return hydrateTransaction(transaction);
+      }
       const incomingUnit =
         body.unitPrice !== undefined ? normalizeValue(body.unitPrice) : undefined;
       const incomingTotal =
         body.totalPrice !== undefined ? normalizeValue(body.totalPrice) : undefined;
+      const changedField =
+        incomingUnit !== undefined
+          ? "unit"
+          : incomingTotal !== undefined
+            ? "total"
+            : body.qty !== undefined
+              ? "qty"
+              : null;
 
-      if (incomingUnit !== undefined) {
-        transaction.unitPrice = incomingUnit;
-        transaction.totalPrice =
-          incomingUnit != null && qty > 0 ? roundMoney(incomingUnit * qty) : null;
-      } else if (incomingTotal !== undefined) {
-        transaction.totalPrice = incomingTotal;
-        transaction.unitPrice =
-          incomingTotal != null && qty > 0 ? roundMoney(incomingTotal / qty) : null;
-      } else if (body.qty !== undefined) {
-        if (transaction.unitPrice != null) {
-          transaction.totalPrice = roundMoney(transaction.unitPrice * qty);
-        } else if (transaction.totalPrice != null) {
-          transaction.unitPrice = roundMoney(transaction.totalPrice / qty);
-        }
+      if (changedField) {
+        const { unit, total } = syncUnitTotal({
+          qty,
+          unit: incomingUnit !== undefined ? incomingUnit : transaction.unitPrice,
+          total: incomingTotal !== undefined ? incomingTotal : transaction.totalPrice,
+          changedField,
+        });
+        transaction.unitPrice = unit;
+        transaction.totalPrice = total;
       }
     }
 
@@ -888,7 +831,6 @@ export async function handleMockApiRequest(
     const summary = {
       totalQty: issues.reduce((sum, txn) => sum + txn.qty, 0),
       totalCount: issues.length,
-      byItemType: [] as Array<{ itemType: ItemType; totalQty: number; totalCount: number }>,
     };
 
     const byItemType = new Map<number, { totalQty: number; totalCount: number }>();
@@ -899,7 +841,7 @@ export async function handleMockApiRequest(
       byItemType.set(txn.itemTypeId, current);
     });
 
-    summary.byItemType = Array.from(byItemType.entries()).map(([itemTypeId, totals]) => {
+    const byItemTypeList = Array.from(byItemType.entries()).map(([itemTypeId, totals]) => {
       return {
         itemType: requireItemType(itemTypeId),
         totalQty: totals.totalQty,
@@ -908,7 +850,11 @@ export async function handleMockApiRequest(
     });
 
     return {
-      summary,
+      summary: {
+        ...summary,
+        byItemType: byItemTypeList,
+      },
+      byItemType: byItemTypeList,
       issues: issues
         .sort(
           (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
@@ -919,28 +865,47 @@ export async function handleMockApiRequest(
 
   if (path === "/api/reports/receipts" && method === "GET") {
     const receipts = filterTransactions(params, "RECEIVE");
+    const totalReceivedCost = receipts.reduce((sum, txn) => {
+      if (txn.totalCost != null) return sum + txn.totalCost;
+      if (txn.unitCost != null) return sum + txn.unitCost * txn.qty;
+      return sum;
+    }, 0);
     const summary = {
       totalQty: receipts.reduce((sum, txn) => sum + txn.qty, 0),
       totalCount: receipts.length,
-      byItemType: [] as Array<{ itemType: ItemType; totalQty: number; totalCount: number }>,
+      totalReceivedCost,
     };
 
-    const byItemType = new Map<number, { totalQty: number; totalCount: number }>();
+    const byItemType = new Map<number, { totalQty: number; totalCount: number; totalReceivedCost: number }>();
     receipts.forEach((txn) => {
-      const current = byItemType.get(txn.itemTypeId) || { totalQty: 0, totalCount: 0 };
+      const current = byItemType.get(txn.itemTypeId) || {
+        totalQty: 0,
+        totalCount: 0,
+        totalReceivedCost: 0,
+      };
       current.totalQty += txn.qty;
       current.totalCount += 1;
+      if (txn.totalCost != null) {
+        current.totalReceivedCost += txn.totalCost;
+      } else if (txn.unitCost != null) {
+        current.totalReceivedCost += txn.unitCost * txn.qty;
+      }
       byItemType.set(txn.itemTypeId, current);
     });
 
-    summary.byItemType = Array.from(byItemType.entries()).map(([itemTypeId, totals]) => ({
+    const byItemTypeList = Array.from(byItemType.entries()).map(([itemTypeId, totals]) => ({
       itemType: requireItemType(itemTypeId),
       totalQty: totals.totalQty,
       totalCount: totals.totalCount,
+      totalReceivedCost: totals.totalReceivedCost,
     }));
 
     return {
-      summary,
+      summary: {
+        ...summary,
+        byItemType: byItemTypeList,
+      },
+      byItemType: byItemTypeList,
       receipts: receipts
         .sort(
           (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
@@ -980,12 +945,37 @@ export async function handleMockApiRequest(
       )
       .map(hydrateTransaction);
 
+    const byUserList = Array.from(byUser.values()).map((entry) => {
+      const user = entry.user;
+      const name = `${user.firstName} ${user.lastName}`.trim();
+      const receiveCount = entry.counts.RECEIVE || 0;
+      const issueCount = entry.counts.ISSUE || 0;
+      const adjustmentCount = entry.counts.ADJUSTMENT || 0;
+      const reversalCount = entry.counts.REVERSAL || 0;
+
+      return {
+        user: {
+          id: user.id,
+          name,
+          email: user.email,
+        },
+        receipts: receiveCount,
+        issues: issueCount,
+        adjustments: adjustmentCount,
+        reversals: reversalCount,
+        totalTransactions: entry.transactions.length,
+        transactions: entry.transactions,
+        counts: entry.counts,
+      };
+    });
+
     return {
       summary: {
         totalTransactions: transactions.length,
-        uniqueUsers: byUser.size,
+        totalUsers: byUserList.length,
+        uniqueUsers: byUserList.length,
       },
-      byUser: Array.from(byUser.values()),
+      byUser: byUserList,
       transactions: hydratedTransactions,
     };
   }
@@ -1005,7 +995,8 @@ export async function handleMockApiRequest(
     return { batches };
   }
 
-  if (path === "/api/reports/finance" && method === "GET") {
+  if (path === "/api/reports/dashboard" && method === "GET") {
+    const isInventoryMode = getActiveMode() === "INVENTORY";
     const itemTypeId = params.get("itemTypeId");
     const scopeParams = new URLSearchParams(params.toString());
     if (itemTypeId) {
@@ -1030,14 +1021,17 @@ export async function handleMockApiRequest(
           return sum;
         }, 0);
         const issuedQty = issues.reduce((sum, txn) => sum + txn.qty, 0);
-        const issuedRevenue = issues.reduce((sum, txn) => {
-          if (txn.totalPrice != null) return sum + txn.totalPrice;
-          if (txn.unitPrice != null) return sum + txn.unitPrice * txn.qty;
-          return sum;
-        }, 0);
+        const issuedRevenue = isInventoryMode
+          ? 0
+          : issues.reduce((sum, txn) => {
+              if (txn.totalPrice != null) return sum + txn.totalPrice;
+              if (txn.unitPrice != null) return sum + txn.unitPrice * txn.qty;
+              return sum;
+            }, 0);
 
         const avgUnitCost = receivedQty ? receivedCost / receivedQty : 0;
-        const avgUnitPrice = issuedQty ? issuedRevenue / issuedQty : 0;
+        const avgUnitPrice =
+          issuedQty && !isInventoryMode ? issuedRevenue / issuedQty : 0;
         const balance = balances.get(itemType.id)?.balance ?? 0;
         const inventoryValue = balance * avgUnitCost;
 
@@ -1050,7 +1044,7 @@ export async function handleMockApiRequest(
           balance,
           avgUnitCost,
           avgUnitPrice,
-          profit: issuedRevenue - receivedCost,
+          profit: isInventoryMode ? 0 : issuedRevenue - receivedCost,
           inventoryValue,
         };
       });
@@ -1078,13 +1072,17 @@ export async function handleMockApiRequest(
     const avgReceiveCost = totals.totalReceivedQty
       ? totals.totalReceivedCost / totals.totalReceivedQty
       : 0;
-    const avgIssuePrice = totals.totalIssuedQty
-      ? totals.totalIssuedRevenue / totals.totalIssuedQty
-      : 0;
-    const estimatedProfit = totals.totalIssuedRevenue - totals.totalReceivedCost;
-    const profitMargin = totals.totalIssuedRevenue
-      ? (estimatedProfit / totals.totalIssuedRevenue) * 100
-      : 0;
+    const avgIssuePrice =
+      totals.totalIssuedQty && !isInventoryMode
+        ? totals.totalIssuedRevenue / totals.totalIssuedQty
+        : 0;
+    const estimatedProfit = isInventoryMode
+      ? 0
+      : totals.totalIssuedRevenue - totals.totalReceivedCost;
+    const profitMargin =
+      totals.totalIssuedRevenue && !isInventoryMode
+        ? (estimatedProfit / totals.totalIssuedRevenue) * 100
+        : 0;
 
     const chartBuckets = new Map<string, { cost: number; revenue: number; profit: number }>();
     scopedTransactions.forEach((txn) => {
@@ -1098,9 +1096,11 @@ export async function handleMockApiRequest(
       if (txn.type === "RECEIVE") {
         const cost = txn.totalCost ?? (txn.unitCost != null ? txn.unitCost * txn.qty : 0);
         bucket.cost += cost;
-        bucket.profit -= cost;
+        if (!isInventoryMode) {
+          bucket.profit -= cost;
+        }
       }
-      if (txn.type === "ISSUE") {
+      if (!isInventoryMode && txn.type === "ISSUE") {
         const revenue = txn.totalPrice ?? (txn.unitPrice != null ? txn.unitPrice * txn.qty : 0);
         bucket.revenue += revenue;
         bucket.profit += revenue;
@@ -1109,11 +1109,14 @@ export async function handleMockApiRequest(
 
     const chartData = Array.from(chartBuckets.entries())
       .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([month, values]) => ({
-        month,
+      .map(([bucket, values]) => ({
+        date: bucket,
+        receivedCost: values.cost,
+        issuedRevenue: values.revenue,
+        profit: values.profit,
+        month: bucket,
         cost: values.cost,
         revenue: values.revenue,
-        profit: values.profit,
       }))
       .slice(-6);
 
@@ -1166,6 +1169,7 @@ export async function handleMockApiRequest(
     return {
       totals: {
         ...totals,
+        inventoryValue: totals.estimatedInventoryValue,
         avgReceiveCost,
         avgIssuePrice,
         estimatedProfit,
@@ -1186,8 +1190,8 @@ export async function handleMockApiRequest(
 export async function handleMockFormData(endpoint: string, formData: FormData) {
   const [path] = endpoint.split("?");
   const userId = 1;
-  const roundMoney = (value: number) => Math.round(value * 100) / 100;
   const activeState = getActiveState();
+  const isInventoryMode = getActiveMode() === "INVENTORY";
 
   if (path === "/api/inventory/receive") {
     const itemTypeId = ensureNumber(formData.get("itemTypeId"), "itemTypeId");
@@ -1209,10 +1213,17 @@ export async function handleMockFormData(endpoint: string, formData: FormData) {
         ? Number(formData.get("totalCost"))
         : null;
 
-    if (unitCost != null && qtyReceived > 0) {
-      totalCost = roundMoney(unitCost * qtyReceived);
-    } else if (totalCost != null && qtyReceived > 0) {
-      unitCost = roundMoney(totalCost / qtyReceived);
+    const costChangedField =
+      unitCost != null ? "unit" : totalCost != null ? "total" : null;
+    if (costChangedField) {
+      const synced = syncUnitTotal({
+        qty: qtyReceived,
+        unit: unitCost,
+        total: totalCost,
+        changedField: costChangedField,
+      });
+      unitCost = synced.unit;
+      totalCost = synced.total;
     }
 
     const files = formData
@@ -1237,7 +1248,7 @@ export async function handleMockFormData(endpoint: string, formData: FormData) {
       qty: qtyReceived,
       createdAt: receivedAt,
       createdById: userId,
-      status: "COMPLETED",
+      status: "POSTED",
       batchId: batch.id,
       notes,
       unitCost,
@@ -1247,7 +1258,14 @@ export async function handleMockFormData(endpoint: string, formData: FormData) {
         : [],
     };
     activeState.transactions.push(transaction);
-    return hydrateTransaction(transaction);
+    return {
+      batch: {
+        id: batch.id,
+        batchCode: batch.batchCode,
+        itemTypeId: batch.itemTypeId,
+      },
+      transaction: hydrateTransaction(transaction),
+    };
   }
 
   if (path === "/api/inventory/issue") {
@@ -1271,10 +1289,21 @@ export async function handleMockFormData(endpoint: string, formData: FormData) {
         ? Number(formData.get("totalPrice"))
         : null;
 
-    if (unitPrice != null && qty > 0) {
-      totalPrice = roundMoney(unitPrice * qty);
-    } else if (totalPrice != null && qty > 0) {
-      unitPrice = roundMoney(totalPrice / qty);
+    const priceChangedField =
+      unitPrice != null ? "unit" : totalPrice != null ? "total" : null;
+    if (priceChangedField) {
+      const synced = syncUnitTotal({
+        qty,
+        unit: unitPrice,
+        total: totalPrice,
+        changedField: priceChangedField,
+      });
+      unitPrice = synced.unit;
+      totalPrice = synced.total;
+    }
+    if (isInventoryMode) {
+      unitPrice = null;
+      totalPrice = null;
     }
 
     const files = formData
@@ -1317,7 +1346,7 @@ export async function handleMockFormData(endpoint: string, formData: FormData) {
       qty,
       createdAt: new Date().toISOString(),
       createdById: userId,
-      status: "COMPLETED",
+      status: "POSTED",
       issuedToType,
       issuedToName: issuedToType === "PERSON" ? issuedToName : issuedToName || branch?.name,
       issuedToBranchId: branch?.id ?? null,
@@ -1330,7 +1359,7 @@ export async function handleMockFormData(endpoint: string, formData: FormData) {
         : [],
     };
     activeState.transactions.push(transaction);
-    return hydrateTransaction(transaction);
+    return { transaction: hydrateTransaction(transaction) };
   }
 
   // Adjustments inventory endpoint removed

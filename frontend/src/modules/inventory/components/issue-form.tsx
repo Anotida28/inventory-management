@@ -23,6 +23,7 @@ import {
 import { useToast } from "components/ui/toast-provider";
 import { apiRequest, apiFormData } from "services/api";
 import { useSystemCopy, useSystemMode } from "lib/system-mode";
+import { qk } from "lib/query-keys";
 
 type AvailableBatch = {
   id: number;
@@ -59,7 +60,7 @@ export default function IssueForm() {
   });
 
   const { data: itemTypes = [], isLoading: isLoadingItemTypes } = useQuery<ItemType[]>({
-    queryKey: ["item-types", mode],
+    queryKey: qk.itemTypes(mode),
     queryFn: async () => {
       const response = await apiRequest<{ itemTypes: ItemType[] }>(
         "/api/item-types",
@@ -69,7 +70,7 @@ export default function IssueForm() {
   });
 
   const { data: batches = [] } = useQuery({
-    queryKey: ["available-batches", formData.itemTypeId, mode],
+    queryKey: qk.batches(mode, formData.itemTypeId),
     queryFn: async () => {
       if (!formData.itemTypeId) return [] as AvailableBatch[];
       const response = await apiRequest<{ batches: AvailableBatch[] }>(
@@ -81,12 +82,20 @@ export default function IssueForm() {
   });
 
   const issueMutation = useMutation({
-    mutationFn: async (data: FormData) => {
-      return apiFormData("/api/inventory/issue", data);
+    mutationFn: async ({
+      formData: payload,
+    }: {
+      formData: FormData;
+      itemTypeId: string;
+    }) => {
+      return apiFormData("/api/inventory/issue", payload);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["stock-balance"] });
-      queryClient.invalidateQueries({ queryKey: ["recent-transactions"] });
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["reports", mode] });
+      queryClient.invalidateQueries({ queryKey: ["transactions", mode] });
+      queryClient.invalidateQueries({
+        queryKey: qk.batches(mode, variables.itemTypeId),
+      });
       toast({ title: "Success", description: "Issue recorded successfully" });
       navigate("/transactions");
     },
@@ -147,7 +156,10 @@ export default function IssueForm() {
       submitFormData.append("files", fileWithMeta.file);
     });
 
-    issueMutation.mutate(submitFormData);
+    issueMutation.mutate({
+      formData: submitFormData,
+      itemTypeId: formData.itemTypeId,
+    });
   };
 
   return (

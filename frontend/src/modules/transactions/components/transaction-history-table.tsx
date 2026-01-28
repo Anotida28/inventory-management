@@ -16,6 +16,7 @@ import {
 import { format } from "date-fns";
 import { Eye, FileText } from "lucide-react";
 import { useSystemCopy } from "lib/system-mode";
+import { getUserDisplayName } from "lib/user-display";
 
 type PaginationFilters = {
   page: number;
@@ -49,9 +50,7 @@ export default function TransactionHistoryTable({
     ? transactions.filter((txn: any) => {
         const recipient =
           txn.issuedToBranch?.name ?? txn.issuedToName ?? "";
-        const createdBy = txn.createdBy
-          ? `${txn.createdBy.firstName} ${txn.createdBy.lastName}`
-          : "";
+        const createdBy = getUserDisplayName(txn.createdBy, "");
         const haystack = [
           txn.id,
           txn.type,
@@ -144,9 +143,7 @@ export default function TransactionHistoryTable({
                        : "-"}
                   </TableCell>
                   <TableCell>
-                    {txn.createdBy
-                      ? `${txn.createdBy.firstName} ${txn.createdBy.lastName}`
-                      : "System"}
+                    {getUserDisplayName(txn.createdBy)}
                   </TableCell>
                   <TableCell>{getTransactionValueDisplay(txn)}</TableCell>
                   <TableCell>

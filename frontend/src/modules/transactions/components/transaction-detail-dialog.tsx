@@ -15,6 +15,8 @@ import { format } from "date-fns";
 import { Download, FileText } from "lucide-react";
 import type { Dispatch, SetStateAction } from "react";
 import { useSystemCopy, useSystemMode } from "lib/system-mode";
+import { syncUnitTotal } from "lib/money-sync";
+import { getUserDisplayName } from "lib/user-display";
 
 type ValueForm = {
   unitCost: string;
@@ -50,8 +52,13 @@ export default function TransactionDetailDialog({
 }: TransactionDetailDialogProps) {
   const copy = useSystemCopy();
   const { mode } = useSystemMode();
+  const isPosted = selectedTransaction?.status === "POSTED";
   const isReversed = selectedTransaction?.status === "REVERSED";
-  const allowEdit = canEditFinancials && !isReversed;
+  const allowEdit = canEditFinancials && isPosted;
+  const showFinancials =
+    !!selectedTransaction &&
+    (selectedTransaction.type === "RECEIVE" ||
+      (selectedTransaction.type === "ISSUE" && mode !== "INVENTORY"));
 
   const parseNumber = (value: string) => {
     if (!value) return null;
@@ -59,40 +66,39 @@ export default function TransactionDetailDialog({
     return Number.isFinite(num) ? num : null;
   };
 
-  const formatMoney = (value: number) => value.toFixed(2);
+  const formatMoney = (value: number | null) =>
+    value == null ? "" : value.toFixed(2);
 
-  const syncReceiveCosts = (next: ValueForm, source: "unitCost" | "totalCost") => {
+  const syncValueForm = (
+    next: ValueForm,
+    changedField: "unit" | "total",
+    type: "RECEIVE" | "ISSUE",
+  ) => {
     const qty = Number(selectedTransaction?.qty || 0);
-    if (!qty || qty <= 0) {
-      if (source === "unitCost") next.totalCost = "";
-      if (source === "totalCost") next.unitCost = "";
-      return next;
-    }
-    if (source === "unitCost") {
-      const unit = parseNumber(next.unitCost);
-      next.totalCost = unit != null ? formatMoney(unit * qty) : "";
-    } else {
-      const total = parseNumber(next.totalCost);
-      next.unitCost = total != null ? formatMoney(total / qty) : "";
-    }
-    return next;
-  };
+    const unitValue = type === "RECEIVE" ? next.unitCost : next.unitPrice;
+    const totalValue = type === "RECEIVE" ? next.totalCost : next.totalPrice;
+    const { unit, total } = syncUnitTotal({
+      qty,
+      unit: parseNumber(unitValue),
+      total: parseNumber(totalValue),
+      changedField,
+    });
+    const nextUnit = formatMoney(unit);
+    const nextTotal = formatMoney(total);
 
-  const syncIssuePrices = (next: ValueForm, source: "unitPrice" | "totalPrice") => {
-    const qty = Number(selectedTransaction?.qty || 0);
-    if (!qty || qty <= 0) {
-      if (source === "unitPrice") next.totalPrice = "";
-      if (source === "totalPrice") next.unitPrice = "";
-      return next;
+    if (type === "RECEIVE") {
+      return {
+        ...next,
+        unitCost: changedField === "total" ? nextUnit : next.unitCost,
+        totalCost: changedField === "unit" ? nextTotal : next.totalCost,
+      };
     }
-    if (source === "unitPrice") {
-      const unit = parseNumber(next.unitPrice);
-      next.totalPrice = unit != null ? formatMoney(unit * qty) : "";
-    } else {
-      const total = parseNumber(next.totalPrice);
-      next.unitPrice = total != null ? formatMoney(total / qty) : "";
-    }
-    return next;
+
+    return {
+      ...next,
+      unitPrice: changedField === "total" ? nextUnit : next.unitPrice,
+      totalPrice: changedField === "unit" ? nextTotal : next.totalPrice,
+    };
   };
   return (
     <Dialog
@@ -148,9 +154,7 @@ export default function TransactionDetailDialog({
               <div>
                 <Label className="text-xs text-muted-foreground">Created By</Label>
                 <p className="font-medium">
-                  {selectedTransaction.createdBy
-                    ? `${selectedTransaction.createdBy.firstName} ${selectedTransaction.createdBy.lastName}`
-                    : "System"}
+                  {getUserDisplayName(selectedTransaction.createdBy)}
                 </p>
               </div>
               {(selectedTransaction.issuedToBranch || selectedTransaction.issuedToName) && (
@@ -182,7 +186,7 @@ export default function TransactionDetailDialog({
                 <div>
                   <Badge
                     variant={
-                      selectedTransaction.status === "COMPLETED"
+                      selectedTransaction.status === "POSTED"
                         ? "default"
                         : "destructive"
                     }
@@ -193,8 +197,7 @@ export default function TransactionDetailDialog({
               </div>
             </div>
 
-            {(selectedTransaction.type === "RECEIVE" ||
-              selectedTransaction.type === "ISSUE") && (
+            {showFinancials && (
               <div className="rounded-lg border border-border p-4">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <div>
@@ -221,22 +224,23 @@ export default function TransactionDetailDialog({
                       <div>
                         <Label
                           className="text-xs text-muted-foreground"
-                          htmlFor="finance-unit-cost"
+                          htmlFor="dashboard-unit-cost"
                         >
                           Unit Cost
                         </Label>
                         {allowEdit ? (
                           <Input
-                            id="finance-unit-cost"
+                            id="dashboard-unit-cost"
                             type="number"
                             min="0"
                             step="0.01"
                             value={valueForm.unitCost}
                             onChange={(e) =>
                               setValueForm((prev) =>
-                                syncReceiveCosts(
+                                syncValueForm(
                                   { ...prev, unitCost: e.target.value },
-                                  "unitCost",
+                                  "unit",
+                                  "RECEIVE",
                                 ),
                               )
                             }
@@ -251,22 +255,23 @@ export default function TransactionDetailDialog({
                       <div>
                         <Label
                           className="text-xs text-muted-foreground"
-                          htmlFor="finance-total-cost"
+                          htmlFor="dashboard-total-cost"
                         >
                           Total Cost
                         </Label>
                         {allowEdit ? (
                           <Input
-                            id="finance-total-cost"
+                            id="dashboard-total-cost"
                             type="number"
                             min="0"
                             step="0.01"
                             value={valueForm.totalCost}
                             onChange={(e) =>
                               setValueForm((prev) =>
-                                syncReceiveCosts(
+                                syncValueForm(
                                   { ...prev, totalCost: e.target.value },
-                                  "totalCost",
+                                  "total",
+                                  "RECEIVE",
                                 ),
                               )
                             }
@@ -284,22 +289,23 @@ export default function TransactionDetailDialog({
                       <div>
                         <Label
                           className="text-xs text-muted-foreground"
-                          htmlFor="finance-unit-price"
+                          htmlFor="dashboard-unit-price"
                         >
                           Unit Price
                         </Label>
                         {allowEdit ? (
                           <Input
-                            id="finance-unit-price"
+                            id="dashboard-unit-price"
                             type="number"
                             min="0"
                             step="0.01"
                             value={valueForm.unitPrice}
                             onChange={(e) =>
                               setValueForm((prev) =>
-                                syncIssuePrices(
+                                syncValueForm(
                                   { ...prev, unitPrice: e.target.value },
-                                  "unitPrice",
+                                  "unit",
+                                  "ISSUE",
                                 ),
                               )
                             }
@@ -314,22 +320,23 @@ export default function TransactionDetailDialog({
                       <div>
                         <Label
                           className="text-xs text-muted-foreground"
-                          htmlFor="finance-total-price"
+                          htmlFor="dashboard-total-price"
                         >
                           Total Price
                         </Label>
                         {allowEdit ? (
                           <Input
-                            id="finance-total-price"
+                            id="dashboard-total-price"
                             type="number"
                             min="0"
                             step="0.01"
                             value={valueForm.totalPrice}
                             onChange={(e) =>
                               setValueForm((prev) =>
-                                syncIssuePrices(
+                                syncValueForm(
                                   { ...prev, totalPrice: e.target.value },
-                                  "totalPrice",
+                                  "total",
+                                  "ISSUE",
                                 ),
                               )
                             }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "components/ui/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "components/ui/card";
@@ -27,6 +27,8 @@ import { Download } from "lucide-react";
 import { apiRequest } from "services/api";
 import { format } from "date-fns";
 import { useSystemCopy, useSystemMode } from "lib/system-mode";
+import { qk } from "lib/query-keys";
+import { getUserDisplayName } from "lib/user-display";
 
 type ItemType = {
   id: number;
@@ -52,9 +54,25 @@ export default function ReportsPage() {
   const ALL_ITEM_OPTION = "ALL_ITEM_TYPES";
   const copy = useSystemCopy();
   const { mode } = useSystemMode();
+  const reportFilters = useMemo(
+    () => ({
+      startDate: dateRange.startDate || "",
+      endDate: dateRange.endDate || "",
+      itemTypeId: itemTypeFilter || "",
+    }),
+    [dateRange.startDate, dateRange.endDate, itemTypeFilter],
+  );
+  const stockBalanceFilters = reportFilters;
+  const activityFilters = useMemo(
+    () => ({
+      startDate: dateRange.startDate || "",
+      endDate: dateRange.endDate || "",
+    }),
+    [dateRange.startDate, dateRange.endDate],
+  );
 
   const { data: itemTypes = [] } = useQuery<ItemType[]>({
-    queryKey: ["item-types", mode],
+    queryKey: qk.itemTypes(mode),
     queryFn: async () => {
       const response = await apiRequest<{ itemTypes: ItemType[] }>(
         "/api/item-types",
@@ -96,12 +114,12 @@ export default function ReportsPage() {
   }, [activitySearch, dateRange.startDate, dateRange.endDate, mode]);
 
   const { data: stockBalance } = useQuery({
-    queryKey: ["stock-balance", mode],
-    queryFn: () => apiRequest<any[]>("/api/reports/stock-balance"),
+    queryKey: qk.stockBalance(mode, stockBalanceFilters),
+    queryFn: () => apiRequest<any>("/api/reports/stock-balance"),
   });
 
   const { data: issuesReport } = useQuery({
-    queryKey: ["issues-report", dateRange, itemTypeFilter, mode],
+    queryKey: qk.issues(mode, reportFilters),
     queryFn: () => {
       const params = new URLSearchParams();
       if (dateRange.startDate) params.append("startDate", dateRange.startDate);
@@ -113,7 +131,7 @@ export default function ReportsPage() {
   });
 
   const { data: receiptsReport } = useQuery({
-    queryKey: ["receipts-report", dateRange, itemTypeFilter, mode],
+    queryKey: qk.receipts(mode, reportFilters),
     queryFn: () => {
       const params = new URLSearchParams();
       if (dateRange.startDate) params.append("startDate", dateRange.startDate);
@@ -126,7 +144,7 @@ export default function ReportsPage() {
   // Adjustments report removed
 
   const { data: userActivityReport } = useQuery({
-    queryKey: ["user-activity-report", dateRange, mode],
+    queryKey: qk.userActivity(mode, activityFilters),
     queryFn: () => {
       const params = new URLSearchParams();
       if (dateRange.startDate) params.append("startDate", dateRange.startDate);
@@ -135,9 +153,12 @@ export default function ReportsPage() {
     },
   });
 
+  const stockBalanceItems = Array.isArray(stockBalance)
+    ? stockBalance
+    : stockBalance?.byItemType ?? [];
   const normalizedStockSearch = stockSearch.trim().toLowerCase();
   const filteredStockBalance = normalizedStockSearch
-    ? (stockBalance ?? []).filter((item: any) => {
+    ? stockBalanceItems.filter((item: any) => {
         const haystack = [
           item.itemType?.name,
           item.itemType?.code,
@@ -148,15 +169,13 @@ export default function ReportsPage() {
           .toLowerCase();
         return haystack.includes(normalizedStockSearch);
       })
-    : stockBalance ?? [];
+    : stockBalanceItems;
 
   const normalizedIssuesSearch = issuesSearch.trim().toLowerCase();
   const filteredIssues = normalizedIssuesSearch
     ? (issuesReport?.issues ?? []).filter((item: any) => {
         const recipient = item.issuedToBranch?.name || item.issuedToName || "";
-        const user = item.createdBy
-          ? `${item.createdBy.firstName} ${item.createdBy.lastName}`
-          : "";
+        const user = getUserDisplayName(item.createdBy, "");
         const haystack = [
           item.itemType?.name,
           recipient,
@@ -170,13 +189,13 @@ export default function ReportsPage() {
         return haystack.includes(normalizedIssuesSearch);
       })
     : issuesReport?.issues ?? [];
+  const issuesByItemType =
+    issuesReport?.byItemType ?? issuesReport?.summary?.byItemType ?? [];
 
   const normalizedReceiptsSearch = receiptsSearch.trim().toLowerCase();
   const filteredReceipts = normalizedReceiptsSearch
     ? (receiptsReport?.receipts ?? []).filter((item: any) => {
-        const user = item.createdBy
-          ? `${item.createdBy.firstName} ${item.createdBy.lastName}`
-          : "";
+        const user = getUserDisplayName(item.createdBy, "");
         const haystack = [
           item.itemType?.name,
           item.batch?.batchCode,
@@ -190,14 +209,15 @@ export default function ReportsPage() {
         return haystack.includes(normalizedReceiptsSearch);
       })
     : receiptsReport?.receipts ?? [];
+  const receiptsByItemType =
+    receiptsReport?.byItemType ?? receiptsReport?.summary?.byItemType ?? [];
 
   const normalizedActivitySearch = activitySearch.trim().toLowerCase();
   const filteredUserGroups = normalizedActivitySearch
     ? (userActivityReport?.byUser ?? []).filter((group: any) => {
         const user = group.user || {};
         const haystack = [
-          user.firstName,
-          user.lastName,
+          getUserDisplayName(user, ""),
           user.email,
         ]
           .filter(Boolean)
@@ -366,7 +386,7 @@ export default function ReportsPage() {
                     </TableRow>
                   ) : (
                     pagedStockBalance.map((item: any) => (
-                      <TableRow key={item.id}>
+                      <TableRow key={item.itemType?.id ?? item.id}>
                         <TableCell className="font-medium">
                           {item.itemType.name}
                         </TableCell>
@@ -480,9 +500,7 @@ export default function ReportsPage() {
                           Quantity: item.qty,
                           Recipient: item.issuedToBranch?.name || item.issuedToName || "-",
                           Type: item.issuedToBranch ? "BRANCH" : item.issuedToType || "-",
-                          User: item.createdBy
-                            ? `${item.createdBy.firstName} ${item.createdBy.lastName}`
-                            : "System",
+                          User: getUserDisplayName(item.createdBy),
                           Notes: item.notes || "-",
                         })) || [];
                       exportToCSV(exportData, "issues-report");
@@ -517,7 +535,7 @@ export default function ReportsPage() {
                         {copy.itemTypePlural}
                       </p>
                       <p className="text-2xl font-bold">
-                        {issuesReport.summary.byItemType.length}
+                        {issuesByItemType.length}
                       </p>
                     </div>
                   </div>
@@ -557,9 +575,7 @@ export default function ReportsPage() {
                           {item.issuedToBranch?.name || item.issuedToName || "-"}
                         </TableCell>
                         <TableCell>
-                          {item.createdBy
-                            ? `${item.createdBy.firstName} ${item.createdBy.lastName}`
-                            : "System"}
+                          {getUserDisplayName(item.createdBy)}
                         </TableCell>
                       </TableRow>
                     ))
@@ -637,9 +653,7 @@ export default function ReportsPage() {
                           [mode === "INVENTORY"
                             ? "Batch / Serial Number"
                             : "Batch Code"]: item.batch?.batchCode || "-",
-                          User: item.createdBy
-                            ? `${item.createdBy.firstName} ${item.createdBy.lastName}`
-                            : "System",
+                          User: getUserDisplayName(item.createdBy),
                           Notes: item.notes || "-",
                         })) || [];
                       exportToCSV(exportData, "receipts-report");
@@ -674,7 +688,7 @@ export default function ReportsPage() {
                         {copy.itemTypePlural}
                       </p>
                       <p className="text-2xl font-bold">
-                        {receiptsReport.summary.byItemType.length}
+                        {receiptsByItemType.length}
                       </p>
                     </div>
                   </div>
@@ -714,9 +728,7 @@ export default function ReportsPage() {
                         <TableCell>{item.qty.toLocaleString()}</TableCell>
                         <TableCell>{item.batch?.batchCode || "-"}</TableCell>
                         <TableCell>
-                          {item.createdBy
-                            ? `${item.createdBy.firstName} ${item.createdBy.lastName}`
-                            : "System"}
+                          {getUserDisplayName(item.createdBy)}
                         </TableCell>
                       </TableRow>
                     ))
@@ -791,9 +803,7 @@ export default function ReportsPage() {
                       const exportData =
                         userActivityReport?.transactions?.map((item: any) => ({
                           Date: format(new Date(item.createdAt), "PP"),
-                          User: item.createdBy
-                            ? `${item.createdBy.firstName} ${item.createdBy.lastName}`
-                            : "System",
+                          User: getUserDisplayName(item.createdBy),
                           Type: item.type,
                           [copy.itemTypeLabel]: item.itemType.name,
                           Quantity: item.qty,
@@ -820,9 +830,10 @@ export default function ReportsPage() {
                       </p>
                     </div>
                     <div>
-                      <p className="text-sm text-muted-foreground">Unique Users</p>
+                      <p className="text-sm text-muted-foreground">Total Users</p>
                       <p className="text-2xl font-bold">
-                        {userActivityReport.summary.uniqueUsers}
+                        {userActivityReport.summary.totalUsers ??
+                          userActivityReport.summary.uniqueUsers}
                       </p>
                     </div>
                   </div>
@@ -836,57 +847,71 @@ export default function ReportsPage() {
                       : "No user activity available"}
                   </div>
                 ) : (
-                  pagedUserGroups.map((userGroup: any) => (
-                    <div
-                      key={userGroup.user.id}
-                      className="rounded-lg border border-border p-4"
-                    >
-                      <div className="mb-3 flex items-center justify-between">
-                        <div>
-                          <p className="font-semibold">
-                            {userGroup.user.firstName} {userGroup.user.lastName}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            {userGroup.user.email}
-                          </p>
+                  pagedUserGroups.map((userGroup: any, index: number) => {
+                    const receiveCount =
+                      userGroup.receipts ?? userGroup.counts?.RECEIVE ?? 0;
+                    const issueCount =
+                      userGroup.issues ?? userGroup.counts?.ISSUE ?? 0;
+                    const adjustmentCount =
+                      userGroup.adjustments ?? userGroup.counts?.ADJUSTMENT ?? 0;
+                    const reversalCount =
+                      userGroup.reversals ?? userGroup.counts?.REVERSAL ?? 0;
+                    const totalTransactions =
+                      userGroup.totalTransactions ??
+                      userGroup.transactions?.length ??
+                      receiveCount + issueCount + adjustmentCount + reversalCount;
+
+                    return (
+                      <div
+                        key={
+                          userGroup.user?.id ??
+                          userGroup.user?.email ??
+                          userGroup.user?.name ??
+                          index
+                        }
+                        className="rounded-lg border border-border p-4"
+                      >
+                        <div className="mb-3 flex items-center justify-between">
+                          <div>
+                            <p className="font-semibold">
+                              {getUserDisplayName(userGroup.user)}
+                            </p>
+                            {userGroup.user?.email && (
+                              <p className="text-sm text-muted-foreground">
+                                {userGroup.user.email}
+                              </p>
+                            )}
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm text-muted-foreground">
+                              Total Transactions
+                            </p>
+                            <p className="text-xl font-bold">
+                              {totalTransactions}
+                            </p>
+                          </div>
                         </div>
-                        <div className="text-right">
-                          <p className="text-sm text-muted-foreground">
-                            Total Transactions
-                          </p>
-                          <p className="text-xl font-bold">
-                            {userGroup.transactions.length}
-                          </p>
+                        <div className="grid grid-cols-4 gap-4 text-sm">
+                          <div>
+                            <p className="text-muted-foreground">Receives</p>
+                            <p className="font-semibold">{receiveCount}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Issues</p>
+                            <p className="font-semibold">{issueCount}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Adjustments</p>
+                            <p className="font-semibold">{adjustmentCount}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Reversals</p>
+                            <p className="font-semibold">{reversalCount}</p>
+                          </div>
                         </div>
                       </div>
-                      <div className="grid grid-cols-4 gap-4 text-sm">
-                        <div>
-                          <p className="text-muted-foreground">Receives</p>
-                          <p className="font-semibold">
-                            {userGroup.counts.RECEIVE || 0}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground">Issues</p>
-                          <p className="font-semibold">
-                            {userGroup.counts.ISSUE || 0}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground">Adjustments</p>
-                          <p className="font-semibold">
-                            {userGroup.counts.ADJUSTMENT || 0}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground">Reversals</p>
-                          <p className="font-semibold">
-                            {userGroup.counts.REVERSAL || 0}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
               {activityTotal > 0 && (

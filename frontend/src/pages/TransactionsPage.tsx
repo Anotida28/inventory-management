@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "components/ui/page-header";
 import TransactionDetailDialog from "modules/transactions/components/transaction-detail-dialog";
@@ -14,6 +14,7 @@ import {
 import { apiRequest } from "services/api";
 import { useToast } from "components/ui/toast-provider";
 import { useSystemCopy, useSystemMode } from "lib/system-mode";
+import { qk, type TxnFilter } from "lib/query-keys";
 
 type ItemType = {
   id: number;
@@ -43,12 +44,29 @@ export default function TransactionsPage() {
   const { toast } = useToast();
   const copy = useSystemCopy();
   const { mode } = useSystemMode();
+  const isInventoryMode = mode === "INVENTORY";
   const queryClient = useQueryClient();
   const [selectedTransaction, setSelectedTransaction] = useState<any>(null);
   const [valueForm, setValueForm] = useState(createEmptyFinancialForm);
   const [filters, setFilters] = useState<TransactionFiltersState>(
     DEFAULT_TRANSACTION_FILTERS,
   );
+  const transactionFiltersKey = useMemo<TxnFilter>(() => {
+    const normalizedType =
+      filters.type === "RECEIVE" ||
+      filters.type === "ISSUE" ||
+      filters.type === "REVERSAL" ||
+      filters.type === "ADJUSTMENT"
+        ? (filters.type as TxnFilter["type"])
+        : undefined;
+
+    return {
+      type: normalizedType,
+      itemTypeId: filters.itemTypeId || "",
+      startDate: filters.startDate || "",
+      endDate: filters.endDate || "",
+    };
+  }, [filters.type, filters.itemTypeId, filters.startDate, filters.endDate]);
 
   const canEditFinancials = false;
 
@@ -56,7 +74,12 @@ export default function TransactionsPage() {
     value != null ? value.toString() : "";
 
   const { data: transactionsData, isLoading } = useQuery({
-    queryKey: ["transactions", filters, mode],
+    queryKey: qk.transactions(
+      mode,
+      transactionFiltersKey,
+      filters.page,
+      filters.limit,
+    ),
     queryFn: () => {
       const params = buildTransactionQueryParams(filters);
       return apiRequest<any>(`/api/transactions?${params.toString()}`);
@@ -64,7 +87,7 @@ export default function TransactionsPage() {
   });
 
   const { data: itemTypes = [] } = useQuery<ItemType[]>({
-    queryKey: ["item-types", mode],
+    queryKey: qk.itemTypes(mode),
     queryFn: async () => {
       const response = await apiRequest<{ itemTypes: ItemType[] }>(
         "/api/item-types",
@@ -104,12 +127,19 @@ export default function TransactionsPage() {
         title: "Financial values saved",
         description: "Transaction costs were updated successfully.",
       });
-      queryClient.invalidateQueries({ queryKey: ["transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["recent-transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["finance-data"] });
-      queryClient.invalidateQueries({ queryKey: ["issues-report"] });
-      queryClient.invalidateQueries({ queryKey: ["receipts-report"] });
-      queryClient.invalidateQueries({ queryKey: ["user-activity-report"] });
+      queryClient.invalidateQueries({ queryKey: ["reports", mode] });
+      queryClient.invalidateQueries({ queryKey: ["transactions", mode] });
+      if (updated?.id != null) {
+        queryClient.invalidateQueries({
+          queryKey: qk.transaction(mode, updated.id),
+        });
+      }
+      const itemTypeId = updated?.itemType?.id ?? updated?.itemTypeId;
+      if (itemTypeId != null) {
+        queryClient.invalidateQueries({
+          queryKey: qk.batches(mode, itemTypeId),
+        });
+      }
     },
     onError: (error: any) => {
       toast({
@@ -121,9 +151,11 @@ export default function TransactionsPage() {
   });
 
   const handleViewDetails = async (transactionId: number) => {
-    const transaction = await apiRequest<any>(
-      `/api/transactions/${transactionId}`,
-    );
+    const transaction = await queryClient.fetchQuery({
+      queryKey: qk.transaction(mode, transactionId),
+      queryFn: () =>
+        apiRequest<any>(`/api/transactions/${transactionId}`),
+    });
     setSelectedTransaction(transaction);
     const computedTotalCost =
       transaction.totalCost ??
@@ -159,6 +191,9 @@ export default function TransactionsPage() {
   };
 
   const getTransactionValueDisplay = (txn: any) => {
+    if (isInventoryMode && txn.type === "ISSUE") {
+      return "--";
+    }
     if (txn.type === "RECEIVE") {
       if (txn.totalCost != null) {
         return formatAmount(txn.totalCost);
@@ -193,6 +228,22 @@ export default function TransactionsPage() {
       toast({
         title: "Edit blocked",
         description: "Reversed transactions cannot be edited.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (selectedTransaction.status !== "POSTED") {
+      toast({
+        title: "Edit blocked",
+        description: "Only posted transactions can be edited.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (isInventoryMode && selectedTransaction.type === "ISSUE") {
+      toast({
+        title: "Edit blocked",
+        description: "Issue values are not editable in inventory mode.",
         variant: "destructive",
       });
       return;

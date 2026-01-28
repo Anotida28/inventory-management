@@ -23,6 +23,8 @@ import {
 import { useToast } from "components/ui/toast-provider";
 import { apiRequest, apiFormData } from "services/api";
 import { useSystemCopy, useSystemMode } from "lib/system-mode";
+import { qk } from "lib/query-keys";
+import { syncUnitTotal } from "lib/money-sync";
 
 type ItemType = {
   id: number;
@@ -44,10 +46,12 @@ export default function ReceiveForm() {
     qtyReceived: "",
     receivedAt: new Date().toISOString().split("T")[0],
     notes: "",
+    unitCost: "",
+    totalCost: "",
   });
 
   const { data: itemTypes = [], isLoading: isLoadingItemTypes } = useQuery<ItemType[]>({
-    queryKey: ["item-types", mode],
+    queryKey: qk.itemTypes(mode),
     queryFn: async () => {
       const response = await apiRequest<{ itemTypes: ItemType[] }>(
         "/api/item-types",
@@ -57,12 +61,20 @@ export default function ReceiveForm() {
   });
 
   const receiveMutation = useMutation({
-    mutationFn: async (data: FormData) => {
-      return apiFormData("/api/inventory/receive", data);
+    mutationFn: async ({
+      formData: payload,
+    }: {
+      formData: FormData;
+      itemTypeId: string;
+    }) => {
+      return apiFormData("/api/inventory/receive", payload);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["stock-balance"] });
-      queryClient.invalidateQueries({ queryKey: ["recent-transactions"] });
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["reports", mode] });
+      queryClient.invalidateQueries({ queryKey: ["transactions", mode] });
+      queryClient.invalidateQueries({
+        queryKey: qk.batches(mode, variables.itemTypeId),
+      });
       toast({ title: "Success", description: "Receipt recorded successfully" });
       navigate("/transactions");
     },
@@ -83,6 +95,40 @@ export default function ReceiveForm() {
       .replace(/[^A-Z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "")
       .slice(0, 20) || "NEW";
+  const parseNumber = (value: string) => {
+    if (!value) return null;
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : null;
+  };
+  const formatMoneyInput = (value: number | null) =>
+    value == null ? "" : value.toFixed(2);
+  const syncMoneyInputs = ({
+    qty,
+    unitValue,
+    totalValue,
+    changedField,
+  }: {
+    qty: number;
+    unitValue: string;
+    totalValue: string;
+    changedField: "unit" | "total" | "qty";
+  }) => {
+    const { unit, total } = syncUnitTotal({
+      qty,
+      unit: parseNumber(unitValue),
+      total: parseNumber(totalValue),
+      changedField,
+    });
+    const nextUnit = formatMoneyInput(unit);
+    const nextTotal = formatMoneyInput(total);
+    if (changedField === "unit") {
+      return { unitCost: unitValue, totalCost: nextTotal };
+    }
+    if (changedField === "total") {
+      return { unitCost: nextUnit, totalCost: totalValue };
+    }
+    return { unitCost: nextUnit, totalCost: nextTotal };
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -108,7 +154,7 @@ export default function ReceiveForm() {
             }),
           });
           itemTypeId = String(created.id);
-          queryClient.invalidateQueries({ queryKey: ["item-types"] });
+          queryClient.invalidateQueries({ queryKey: qk.itemTypes(mode) });
         } catch (error: any) {
           toast({
             title: "Unable to create item type",
@@ -141,12 +187,21 @@ export default function ReceiveForm() {
     if (formData.notes) {
       submitFormData.append("notes", formData.notes);
     }
+    if (formData.unitCost) {
+      submitFormData.append("unitCost", formData.unitCost);
+    }
+    if (formData.totalCost) {
+      submitFormData.append("totalCost", formData.totalCost);
+    }
     // Append files directly - the backend will handle upload
     files.forEach((fileWithMeta) => {
       submitFormData.append("files", fileWithMeta.file);
     });
 
-    receiveMutation.mutate(submitFormData);
+    receiveMutation.mutate({
+      formData: submitFormData,
+      itemTypeId,
+    });
   };
 
   return (
@@ -254,7 +309,16 @@ export default function ReceiveForm() {
                   min="1"
                   value={formData.qtyReceived}
                   onChange={(e) =>
-                    setFormData({ ...formData, qtyReceived: e.target.value })
+                    setFormData((prev) => ({
+                      ...prev,
+                      qtyReceived: e.target.value,
+                      ...syncMoneyInputs({
+                        qty: parseNumber(e.target.value) || 0,
+                        unitValue: prev.unitCost,
+                        totalValue: prev.totalCost,
+                        changedField: "qty",
+                      }),
+                    }))
                   }
                   required
                 />
@@ -270,6 +334,53 @@ export default function ReceiveForm() {
                     setFormData({ ...formData, receivedAt: e.target.value })
                   }
                   required
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-6 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="unitCost">Unit Cost</Label>
+                <Input
+                  id="unitCost"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formData.unitCost}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      ...syncMoneyInputs({
+                        qty: parseNumber(prev.qtyReceived) || 0,
+                        unitValue: e.target.value,
+                        totalValue: prev.totalCost,
+                        changedField: "unit",
+                      }),
+                    }))
+                  }
+                  placeholder="Optional"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="totalCost">Total Cost</Label>
+                <Input
+                  id="totalCost"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formData.totalCost}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      ...syncMoneyInputs({
+                        qty: parseNumber(prev.qtyReceived) || 0,
+                        unitValue: prev.unitCost,
+                        totalValue: e.target.value,
+                        changedField: "total",
+                      }),
+                    }))
+                  }
+                  placeholder="Optional"
                 />
               </div>
             </div>

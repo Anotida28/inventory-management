@@ -17,12 +17,12 @@ export const SEEDED_USERS = [
   },
   {
     id: 2,
-    username: "finance",
-    password: "finance123", // seeded password
-    firstName: "Finance",
+    username: "dashboard",
+    password: "dashboard123", // seeded password
+    firstName: "Dashboard",
     lastName: "User",
-    email: "finance@omari.internal",
-    role: "FINANCE" as const,
+    email: "dashboard@omari.internal",
+    role: "DASHBOARD" as const,
     isActive: true,
   },
 ];

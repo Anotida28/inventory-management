@@ -73,7 +73,7 @@ const SYSTEM_MODE_COPY: Record<SystemMode, SystemCopy> = {
     issueDescription: "Issue inventory to branches or individuals",
     transactionsDescription: "View and manage all inventory transactions",
     dashboardDescription:
-      "Track item costs, revenue, and profit margins across your inventory operations.",
+      "Track inventory costs and stock value across your operations.",
     itemTypeLabel: "Item Type",
     itemTypePlural: "Item Types",
     itemTypeAllLabel: "All Item Types",
