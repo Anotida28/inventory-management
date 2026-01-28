@@ -8,7 +8,7 @@ import InventoryIssuePage from "pages/InventoryIssuePage";
 // import CardTypesPage from "pages/CardTypesPage";
 import TransactionsPage from "pages/TransactionsPage";
 import ReportsPage from "pages/ReportsPage";
-import FinancePage from "pages/FinancePage";
+// import FinancePage from "pages/FinancePage";
 // import AdminAdjustPage from "pages/AdminAdjustPage";
 import "./App.css";
 
@@ -26,10 +26,10 @@ export default function App() {
             {/* <Route path="/card-types" element={<CardTypesPage />} /> */}
             <Route path="/transactions" element={<TransactionsPage />} />
             <Route path="/reports" element={<ReportsPage />} />
-            <Route path="/finance" element={<FinancePage />} />
+            {/* <Route path="/finance" element={<FinancePage />} /> */}
             {/* <Route path="/admin/adjust" element={<AdminAdjustPage />} /> */}
           </Route>
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </BrowserRouter>
     </Providers>

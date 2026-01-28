@@ -75,7 +75,7 @@ export default function IssueForm() {
       queryClient.invalidateQueries({ queryKey: ["stock-balance"] });
       queryClient.invalidateQueries({ queryKey: ["recent-transactions"] });
       toast({ title: "Success", description: "Cards issued successfully" });
-      navigate("/dashboard");
+      navigate("/transactions");
     },
     onError: (error: any) => {
       toast({

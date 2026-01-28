@@ -36,7 +36,7 @@ export default function LoginPage() {
       }
 
       // Optionally store user info in localStorage/sessionStorage if needed
-      navigate("/dashboard");
+      navigate("/transactions");
     } catch (err) {
       setError("An error occurred. Please try again.");
     } finally {

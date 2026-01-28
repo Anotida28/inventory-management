@@ -114,7 +114,7 @@ type CardType = {
   code: string;
 };
 
-export default function FinancePage() {
+export default function DashboardPage() {
   
   const queryClient = useQueryClient();
   const hasAccess = true;
@@ -283,7 +283,7 @@ export default function FinancePage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Finance Dashboard"
+        title="Dashboard"
         description="Track card costs, revenue, and profit margins across your inventory operations."
       />
 

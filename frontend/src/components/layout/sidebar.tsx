@@ -31,7 +31,7 @@ const navigation: NavItem[] = [
   { name: "Issue Cards", href: "/inventory/issue", icon: PackageCheck, roles: ["ADMIN", "CLERK", "AUDITOR", "FINANCE"] },
   { name: "Transactions", href: "/transactions", icon: FileText, roles: ["ADMIN", "CLERK", "AUDITOR", "FINANCE"] },
   { name: "Reports", href: "/reports", icon: BarChart3, roles: ["ADMIN", "CLERK", "AUDITOR", "FINANCE"] },
-  { name: "Finance Desk", href: "/finance", icon: Wallet, roles: ["FINANCE", "ADMIN"] },
+  // { name: "Finance Desk", href: "/finance", icon: Wallet, roles: ["FINANCE", "ADMIN"] },
   // Adjustments nav item fully removed
 ];
 

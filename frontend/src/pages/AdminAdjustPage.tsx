@@ -129,8 +129,8 @@ export default function AdjustPage() {
                   auditor users.
                 </p>
               </div>
-              <Button onClick={() => navigate("/dashboard")}>
-                Go to Dashboard
+              <Button onClick={() => navigate("/transactions")}> 
+                Go to Transactions
               </Button>
             </div>
           </CardContent>
