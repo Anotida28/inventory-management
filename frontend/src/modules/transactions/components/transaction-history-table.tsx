@@ -1,8 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import { Badge, type BadgeProps } from "components/ui/badge";
 import { Button } from "components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "components/ui/card";
+import { Input } from "components/ui/input";
 import {
   Table,
   TableBody,
@@ -40,10 +42,41 @@ export default function TransactionHistoryTable({
   getTransactionValueDisplay,
 }: TransactionHistoryTableProps) {
   const copy = useSystemCopy();
+  const [searchTerm, setSearchTerm] = useState("");
+  const normalizedSearch = searchTerm.trim().toLowerCase();
+  const transactions = transactionsData?.transactions ?? [];
+  const filteredTransactions = normalizedSearch
+    ? transactions.filter((txn: any) => {
+        const recipient =
+          txn.issuedToBranch?.name ?? txn.issuedToName ?? "";
+        const createdBy = txn.createdBy
+          ? `${txn.createdBy.firstName} ${txn.createdBy.lastName}`
+          : "";
+        const haystack = [
+          txn.id,
+          txn.type,
+          txn.itemType?.name,
+          txn.itemType?.code,
+          txn.qty,
+          recipient,
+          createdBy,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        return haystack.includes(normalizedSearch);
+      })
+    : transactions;
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <CardTitle>Transaction History</CardTitle>
+        <Input
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          placeholder="Search transactions..."
+          className="w-full sm:w-64"
+        />
       </CardHeader>
       <CardContent>
         <Table>
@@ -68,17 +101,17 @@ export default function TransactionHistoryTable({
                   Loading...
                 </TableCell>
               </TableRow>
-            ) : transactionsData?.transactions?.length === 0 ? (
+            ) : filteredTransactions.length === 0 ? (
               <TableRow>
                 <TableCell
                   colSpan={10}
                   className="text-center py-8 text-muted-foreground"
                 >
-                  No transactions found
+                  {normalizedSearch ? "No matching transactions" : "No transactions found"}
                 </TableCell>
               </TableRow>
             ) : (
-              transactionsData?.transactions?.map((txn: any) => (
+              filteredTransactions.map((txn: any) => (
                 <TableRow
                   key={txn.id}
                   className="cursor-pointer hover:bg-muted/60"
@@ -89,17 +122,17 @@ export default function TransactionHistoryTable({
                       {txn.type}
                     </Badge>
                   </TableCell>
-                  <TableCell>{txn.cardType.name}</TableCell>
+                  <TableCell>{txn.itemType?.name ?? "-"}</TableCell>
                   <TableCell>{
                     typeof txn.qty === "number" && !isNaN(txn.qty)
                       ? txn.qty.toLocaleString()
                       : "-"
                   }</TableCell>
                   <TableCell>
-                    {txn.issuedToName ? (
+                    {txn.issuedToBranch || txn.issuedToName ? (
                       <span>
-                        {txn.issuedToType === "BRANCH" ? "🏢" : "👤"}{" "}
-                        {txn.issuedToName}
+                        {txn.issuedToBranch ? "🏢" : txn.issuedToType === "PERSON" ? "👤" : "🏢"}{" "}
+                        {txn.issuedToBranch?.name ?? txn.issuedToName}
                       </span>
                     ) : (
                       <span className="text-muted-foreground/60">-</span>

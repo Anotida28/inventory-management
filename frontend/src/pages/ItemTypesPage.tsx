@@ -38,8 +38,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "components/ui/card";
 import { useToast } from "components/ui/toast-provider";
 import { apiRequest } from "services/api";
 import { StatCard } from "components/ui/stat-card";
+import { useSystemMode } from "lib/system-mode";
 
-interface CardType {
+interface ItemType {
   id: number;
   code: string;
   name: string;
@@ -47,55 +48,58 @@ interface CardType {
   isActive: boolean;
 }
 
-export default function CardTypesPage() {
+export default function ItemTypesPage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [editingCardType, setEditingCardType] = useState<CardType | null>(null);
+  const [editingItemType, setEditingItemType] = useState<ItemType | null>(null);
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { mode } = useSystemMode();
   
   const canManage = true;
 
-  const { data: cardTypes = [], isLoading } = useQuery<CardType[]>({
-    queryKey: ["card-types"],
+  const { data: itemTypes = [], isLoading } = useQuery<ItemType[]>({
+    queryKey: ["item-types", mode],
     queryFn: async () => {
-      const response = await apiRequest<{ cardTypes: CardType[] }>("/api/card-types?includeInactive=true");
-      return response.cardTypes;
+      const response = await apiRequest<{ itemTypes: ItemType[] }>(
+        "/api/item-types?includeInactive=true",
+      );
+      return response.itemTypes;
     },
   });
 
   const { totalCount, activeCount, inactiveCount, activeRatio } =
     useMemo(() => {
-      const active = cardTypes.filter((cardType) => cardType.isActive).length;
+      const active = itemTypes.filter((itemType) => itemType.isActive).length;
       return {
-        totalCount: cardTypes.length,
+        totalCount: itemTypes.length,
         activeCount: active,
-        inactiveCount: Math.max(cardTypes.length - active, 0),
+        inactiveCount: Math.max(itemTypes.length - active, 0),
         activeRatio:
-          cardTypes.length === 0
+          itemTypes.length === 0
             ? 0
-            : Math.round((active / cardTypes.length) * 100),
+            : Math.round((active / itemTypes.length) * 100),
       };
-    }, [cardTypes]);
+    }, [itemTypes]);
 
   const createMutation = useMutation({
-    mutationFn: (data: Partial<CardType>) =>
-      apiRequest("/api/card-types", {
+    mutationFn: (data: Partial<ItemType>) =>
+      apiRequest("/api/item-types", {
         method: "POST",
         body: JSON.stringify(data),
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["card-types"] });
+      queryClient.invalidateQueries({ queryKey: ["item-types"] });
       setIsCreateOpen(false);
       toast({
-        title: "Card type created",
-        description: "The card type is now available for use.",
+        title: "Item type created",
+        description: "The item type is now available for use.",
       });
     },
     onError: (error: any) => {
       toast({
-        title: "Unable to create card type",
+        title: "Unable to create item type",
         description: error.message,
         variant: "destructive",
       });
@@ -103,23 +107,23 @@ export default function CardTypesPage() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: Partial<CardType> }) =>
-      apiRequest(`/api/card-types/${id}`, {
+    mutationFn: ({ id, data }: { id: number; data: Partial<ItemType> }) =>
+      apiRequest(`/api/item-types/${id}`, {
         method: "PATCH",
         body: JSON.stringify(data),
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["card-types"] });
+      queryClient.invalidateQueries({ queryKey: ["item-types"] });
       setIsEditOpen(false);
-      setEditingCardType(null);
+      setEditingItemType(null);
       toast({
-        title: "Card type updated",
+        title: "Item type updated",
         description: "Changes saved successfully.",
       });
     },
     onError: (error: any) => {
       toast({
-        title: "Unable to update card type",
+        title: "Unable to update item type",
         description: error.message,
         variant: "destructive",
       });
@@ -128,15 +132,15 @@ export default function CardTypesPage() {
 
   const toggleActiveMutation = useMutation({
     mutationFn: ({ id, isActive }: { id: number; isActive: boolean }) =>
-      apiRequest(`/api/card-types/${id}`, {
+      apiRequest(`/api/item-types/${id}`, {
         method: "PATCH",
         body: JSON.stringify({ isActive }),
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["card-types"] });
+      queryClient.invalidateQueries({ queryKey: ["item-types"] });
       toast({
         title: "Status changed",
-        description: "Card type availability updated.",
+        description: "Item type availability updated.",
       });
     },
     onError: (error: any) => {
@@ -148,19 +152,19 @@ export default function CardTypesPage() {
     },
   });
 
-  const filteredCardTypes = useMemo(() => {
-    if (!searchTerm) return cardTypes;
+  const filteredItemTypes = useMemo(() => {
+    if (!searchTerm) return itemTypes;
     const term = searchTerm.toLowerCase();
-    return cardTypes.filter((type) =>
+    return itemTypes.filter((type) =>
       [type.code, type.name, type.description || ""].some((field) =>
         field.toLowerCase().includes(term),
       ),
     );
-  }, [cardTypes, searchTerm]);
+  }, [itemTypes, searchTerm]);
 
-  const handleEdit = (cardType: CardType) => {
+  const handleEdit = (itemType: ItemType) => {
     if (!canManage) return;
-    setEditingCardType(cardType);
+    setEditingItemType(itemType);
     setIsEditOpen(true);
   };
 
@@ -179,11 +183,11 @@ export default function CardTypesPage() {
 
   const handleUpdate = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!editingCardType) return;
+    if (!editingItemType) return;
     if (!canManage) return;
     const formData = new FormData(e.currentTarget);
     updateMutation.mutate({
-      id: editingCardType.id,
+      id: editingItemType.id,
       data: {
         name: String(formData.get("name") || ""),
         code: String(formData.get("code") || ""),
@@ -194,16 +198,16 @@ export default function CardTypesPage() {
     });
   };
 
-  const exportCardTypes = () => {
-    if (filteredCardTypes.length === 0) {
+  const exportItemTypes = () => {
+    if (filteredItemTypes.length === 0) {
       toast({
         title: "Nothing to export",
-        description: "Adjust your filters or add card types before exporting.",
+        description: "Adjust your filters or add item types before exporting.",
       });
       return;
     }
     // Basic CSV serialization to support ad-hoc reporting downloads.
-    const payload = filteredCardTypes.map((type) => ({
+    const payload = filteredItemTypes.map((type) => ({
       Code: type.code,
       Name: type.name,
       Description: type.description || "",
@@ -220,24 +224,24 @@ export default function CardTypesPage() {
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = `card-types-${new Date().toISOString().split("T")[0]}.csv`;
+    link.download = `item-types-${new Date().toISOString().split("T")[0]}.csv`;
     link.click();
   };
 
   return (
     <div className="space-y-8">
       <PageHeader
-        title="Card Type Catalogue"
+        title="Item Type Catalogue"
         description={
           canManage
-            ? "Configure card products and control their availability for issuance."
-            : "View the registered card types. Editing is limited to clerks and administrators."
+            ? "Configure inventory items and control their availability for issuance."
+            : "View the registered item types. Editing is limited to clerks and administrators."
         }
         action={
           <div className="flex flex-wrap gap-2">
             <Button
               variant="outline"
-              onClick={exportCardTypes}
+              onClick={exportItemTypes}
               className="gap-2"
             >
               <Download className="h-4 w-4" />
@@ -246,7 +250,7 @@ export default function CardTypesPage() {
             {canManage && (
               <Button onClick={() => setIsCreateOpen(true)} className="gap-2">
                 <Plus className="h-4 w-4" />
-                New Card Type
+                New Item Type
               </Button>
             )}
           </div>
@@ -255,7 +259,7 @@ export default function CardTypesPage() {
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <StatCard
-          title="Total card types"
+          title="Total item types"
           value={totalCount}
           description="Overall catalogue footprint."
           icon={Layers}
@@ -282,10 +286,10 @@ export default function CardTypesPage() {
         <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <CardTitle className="text-lg font-semibold text-foreground">
-              Registered Card Types
+              Registered Item Types
             </CardTitle>
             <p className="text-sm text-muted-foreground">
-              Track and manage the catalogue of stock-managed card products.
+              Track and manage the catalogue of stock-managed items.
             </p>
           </div>
           <div className="flex w-full gap-3 md:w-80">
@@ -318,39 +322,39 @@ export default function CardTypesPage() {
                       colSpan={5}
                       className="py-10 text-center text-sm text-muted-foreground"
                     >
-                      Loading card types...
+                      Loading item types...
                     </TableCell>
                   </TableRow>
-                ) : filteredCardTypes.length === 0 ? (
+                ) : filteredItemTypes.length === 0 ? (
                   <TableRow>
                     <TableCell
                       colSpan={5}
                       className="py-10 text-center text-sm text-muted-foreground"
                     >
-                      No card types matched your filters.
+                      No item types matched your filters.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredCardTypes.map((cardType) => (
-                    <TableRow key={cardType.id} className="hover:bg-blue-50/30 dark:hover:bg-blue-500/10">
+                  filteredItemTypes.map((itemType) => (
+                    <TableRow key={itemType.id} className="hover:bg-blue-50/30 dark:hover:bg-blue-500/10">
                       <TableCell className="font-semibold text-foreground">
-                        {cardType.code}
+                        {itemType.code}
                       </TableCell>
                       <TableCell className="text-foreground/80">
-                        {cardType.name}
+                        {itemType.name}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
-                        {cardType.description ? (
-                          cardType.description
+                        {itemType.description ? (
+                          itemType.description
                         ) : (
                           <span className="text-muted-foreground/60">—</span>
                         )}
                       </TableCell>
                       <TableCell>
                         <Badge
-                          variant={cardType.isActive ? "default" : "secondary"}
+                          variant={itemType.isActive ? "default" : "secondary"}
                         >
-                          {cardType.isActive ? "Active" : "Inactive"}
+                          {itemType.isActive ? "Active" : "Inactive"}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
@@ -361,20 +365,20 @@ export default function CardTypesPage() {
                             className="h-8 w-8"
                             onClick={() =>
                               toggleActiveMutation.mutate({
-                                id: cardType.id,
-                                isActive: !cardType.isActive,
+                                id: itemType.id,
+                                isActive: !itemType.isActive,
                               })
                             }
                             disabled={
                               !canManage || toggleActiveMutation.isPending
                             }
                             aria-label={
-                              cardType.isActive
-                                ? "Deactivate card type"
-                                : "Activate card type"
+                              itemType.isActive
+                                ? "Deactivate item type"
+                                : "Activate item type"
                             }
                           >
-                            {cardType.isActive ? (
+                            {itemType.isActive ? (
                               <ToggleRight className="h-4 w-4" />
                             ) : (
                               <ToggleLeft className="h-4 w-4" />
@@ -384,9 +388,9 @@ export default function CardTypesPage() {
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8"
-                            onClick={() => handleEdit(cardType)}
+                            onClick={() => handleEdit(itemType)}
                             disabled={!canManage}
-                            aria-label="Edit card type"
+                            aria-label="Edit item type"
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
@@ -405,19 +409,19 @@ export default function CardTypesPage() {
         <DialogContent className="sm:max-w-lg">
           <form onSubmit={handleCreate}>
             <DialogHeader>
-              <DialogTitle>New Card Type</DialogTitle>
+              <DialogTitle>New Item Type</DialogTitle>
               <DialogDescription>
-                Define the metadata for the new card product.
+                Define the metadata for the new inventory item.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="code">Product Code *</Label>
+                  <Label htmlFor="code">Item Code *</Label>
                   <Input
                     id="code"
                     name="code"
-                    placeholder="e.g. VISA-PREMIUM"
+                    placeholder="e.g. ITEM-001"
                     required
                   />
                 </div>
@@ -426,7 +430,7 @@ export default function CardTypesPage() {
                   <Input
                     id="name"
                     name="name"
-                    placeholder="Premium Visa"
+                    placeholder="Office Chair"
                     required
                   />
                 </div>
@@ -437,7 +441,7 @@ export default function CardTypesPage() {
                   id="description"
                   name="description"
                   rows={3}
-                  placeholder="Short summary of the product."
+                  placeholder="Short summary of the item."
                 />
               </div>
             </div>
@@ -450,7 +454,7 @@ export default function CardTypesPage() {
                 Cancel
               </Button>
               <Button type="submit" disabled={createMutation.isPending}>
-                {createMutation.isPending ? "Creating…" : "Create Card Type"}
+                {createMutation.isPending ? "Creating…" : "Create Item Type"}
               </Button>
             </DialogFooter>
           </form>
@@ -461,19 +465,19 @@ export default function CardTypesPage() {
         <DialogContent className="sm:max-w-lg">
           <form onSubmit={handleUpdate}>
             <DialogHeader>
-              <DialogTitle>Edit Card Type</DialogTitle>
+              <DialogTitle>Edit Item Type</DialogTitle>
               <DialogDescription>
-                Update product details and availability.
+                Update item details and availability.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="edit-code">Product Code *</Label>
+                  <Label htmlFor="edit-code">Item Code *</Label>
                   <Input
                     id="edit-code"
                     name="code"
-                    defaultValue={editingCardType?.code ?? ""}
+                    defaultValue={editingItemType?.code ?? ""}
                     required
                   />
                 </div>
@@ -482,7 +486,7 @@ export default function CardTypesPage() {
                   <Input
                     id="edit-name"
                     name="name"
-                    defaultValue={editingCardType?.name ?? ""}
+                    defaultValue={editingItemType?.name ?? ""}
                     required
                   />
                 </div>
@@ -492,9 +496,9 @@ export default function CardTypesPage() {
                 <Textarea
                   id="edit-description"
                   name="description"
-                  defaultValue={editingCardType?.description ?? ""}
+                  defaultValue={editingItemType?.description ?? ""}
                   rows={3}
-                  placeholder="Short summary of the product."
+                  placeholder="Short summary of the item."
                 />
               </div>
             </div>
@@ -504,7 +508,7 @@ export default function CardTypesPage() {
                 variant="outline"
                 onClick={() => {
                   setIsEditOpen(false);
-                  setEditingCardType(null);
+                  setEditingItemType(null);
                 }}
               >
                 Cancel

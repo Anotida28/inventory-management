@@ -11,7 +11,7 @@ export const SEEDED_USERS = [
     password: "sales123", // seeded password
     firstName: "Sales",
     lastName: "User",
-    email: "sales@omacard.internal",
+    email: "sales@omari.internal",
     role: "SALES" as const,
     isActive: true,
   },
@@ -21,7 +21,7 @@ export const SEEDED_USERS = [
     password: "finance123", // seeded password
     firstName: "Finance",
     lastName: "User",
-    email: "finance@omacard.internal",
+    email: "finance@omari.internal",
     role: "FINANCE" as const,
     isActive: true,
   },
@@ -42,7 +42,7 @@ export function getSeededUser(username: string, password: string) {
   export function getAdminUser() {
     // Optionally, you can add an admin user here if needed
     // Example:
-    // return { id: 3, username: "admin", password: "admin123", firstName: "Admin", lastName: "User", email: "admin@omacard.internal", role: "ADMIN", isActive: true };
+    // return { id: 3, username: "admin", password: "admin123", firstName: "Admin", lastName: "User", email: "admin@omari.internal", role: "ADMIN", isActive: true };
     return SEEDED_USERS[0];
   }
 

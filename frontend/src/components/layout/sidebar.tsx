@@ -66,7 +66,7 @@ export function Sidebar() {
       <div className="flex h-16 items-center border-b border-border px-6">
         <img
           src="/images/20251022_100241_OMARI_LOGO_WITH_AFFILLIATE_STATEMENT_GRADIENT_GREEN_HORIZONTAL_VECTOR_05_page-0001.jpg.png"
-          alt="OmaCard Logo"
+          alt="Omari Logo"
           width={120}
           height={40}
           className="object-contain"

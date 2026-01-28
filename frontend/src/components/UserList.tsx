@@ -1,21 +1,46 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "components/ui/card";
+import { Input } from "components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "components/ui/table";
 import { Badge } from "components/ui/badge";
 import { apiRequest } from "services/api";
 
 export default function UserList() {
+  const [searchTerm, setSearchTerm] = useState("");
   const { data, isLoading } = useQuery({
     queryKey: ["users"],
     queryFn: () => apiRequest<{ users: any[] }>("/api/admin/users"),
   });
 
   const users = data?.users ?? [];
+  const normalizedSearch = searchTerm.trim().toLowerCase();
+  const filteredUsers = normalizedSearch
+    ? users.filter((user) => {
+        const haystack = [
+          user.firstName,
+          user.lastName,
+          user.email,
+          user.role,
+          user.isActive ? "active" : "inactive",
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        return haystack.includes(normalizedSearch);
+      })
+    : users;
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <CardTitle>Users</CardTitle>
+        <Input
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          placeholder="Search users..."
+          className="h-9 w-full sm:w-56"
+        />
       </CardHeader>
       <CardContent>
         <Table>
@@ -34,14 +59,14 @@ export default function UserList() {
                   Loading...
                 </TableCell>
               </TableRow>
-            ) : users.length === 0 ? (
+            ) : filteredUsers.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={4} className="py-6 text-center text-muted-foreground">
-                  No users available.
+                  {normalizedSearch ? "No matching users" : "No users available."}
                 </TableCell>
               </TableRow>
             ) : (
-              users.map((user) => (
+              filteredUsers.map((user) => (
                 <TableRow key={user.id}>
                   <TableCell className="font-medium">
                     {user.firstName} {user.lastName}

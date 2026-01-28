@@ -34,10 +34,18 @@ import { apiRequest, apiFormData } from "services/api";
 import { format } from "date-fns";
 import { AlertTriangle, ShieldAlert } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "components/ui/alert";
+import { useSystemMode } from "lib/system-mode";
+
+type ItemType = {
+  id: number;
+  name: string;
+  code: string;
+};
 
 export default function AdjustPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { mode } = useSystemMode();
   
   const isAdmin = true;
   const isAuditor = false;
@@ -46,22 +54,47 @@ export default function AdjustPage() {
   const queryClient = useQueryClient();
   const [files, setFiles] = useState<FileWithMetadata[]>([]);
   const [formData, setFormData] = useState({
-    cardTypeId: "",
+    itemTypeId: "",
     qty: "",
     notes: "",
   });
+  const [adjustmentSearch, setAdjustmentSearch] = useState("");
 
-  // Hardcoded card types
-  const cardTypes = [
-    { id: 1, name: "Zim-Switch", code: "ZIM-SWITCH" },
-    { id: 2, name: "Visa", code: "VISA" },
-  ];
+  const { data: itemTypes = [] } = useQuery<ItemType[]>({
+    queryKey: ["item-types", mode],
+    queryFn: async () => {
+      const response = await apiRequest<{ itemTypes: ItemType[] }>(
+        "/api/item-types",
+      );
+      return response.itemTypes;
+    },
+  });
 
   const { data: adjustments } = useQuery({
-    queryKey: ["adjustments"],
+    queryKey: ["adjustments", mode],
     queryFn: () => apiRequest<any>("/api/reports/adjustments"),
     enabled: hasAccess,
   });
+
+  const normalizedAdjustmentSearch = adjustmentSearch.trim().toLowerCase();
+  const filteredAdjustments = normalizedAdjustmentSearch
+    ? (adjustments?.adjustments ?? []).filter((adj: any) => {
+        const user = adj.createdBy
+          ? `${adj.createdBy.firstName} ${adj.createdBy.lastName}`
+          : "";
+        const haystack = [
+          adj.itemType?.name,
+          adj.qty,
+          user,
+          adj.notes,
+          adj.createdAt,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        return haystack.includes(normalizedAdjustmentSearch);
+      })
+    : adjustments?.adjustments ?? [];
 
   const adjustMutation = useMutation({
     mutationFn: async (data: FormData) => {
@@ -75,7 +108,7 @@ export default function AdjustPage() {
         title: "Success",
         description: "Inventory adjusted successfully",
       });
-      setFormData({ cardTypeId: "", qty: "", notes: "" });
+      setFormData({ itemTypeId: "", qty: "", notes: "" });
       setFiles([]);
     },
     onError: (error: any) => {
@@ -92,7 +125,7 @@ export default function AdjustPage() {
 
     // Create adjustment transaction with files
     const submitFormData = new FormData();
-    submitFormData.append("cardTypeId", formData.cardTypeId);
+    submitFormData.append("itemTypeId", formData.itemTypeId);
     submitFormData.append("qty", formData.qty);
     if (formData.notes) {
       submitFormData.append("notes", formData.notes);
@@ -173,20 +206,20 @@ export default function AdjustPage() {
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="space-y-2">
-                <Label htmlFor="cardTypeId">Card Type *</Label>
+                <Label htmlFor="itemTypeId">Item Type *</Label>
                 <Select
-                  value={formData.cardTypeId}
+                  value={formData.itemTypeId}
                   onValueChange={(value) =>
-                    setFormData({ ...formData, cardTypeId: value })
+                    setFormData({ ...formData, itemTypeId: value })
                   }
                   required
                   disabled={!isAdmin}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select card type" />
+                    <SelectValue placeholder="Select item type" />
                   </SelectTrigger>
                   <SelectContent>
-                    {cardTypes?.map((type) => (
+                    {itemTypes?.map((type) => (
                       <SelectItem key={type.id} value={type.id.toString()}>
                         {type.name} ({type.code})
                       </SelectItem>
@@ -263,7 +296,7 @@ export default function AdjustPage() {
                   className="flex items-center justify-between rounded-lg border border-border p-3"
                 >
                   <div>
-                    <p className="font-medium">{adj.cardType.name}</p>
+                    <p className="font-medium">{adj.itemType?.name ?? "-"}</p>
                     <p className="text-sm text-muted-foreground">
                       {format(new Date(adj.createdAt), "MMM d, yyyy HH:mm")}
                     </p>
@@ -292,45 +325,64 @@ export default function AdjustPage() {
 
       {/* Full Adjustment History Table */}
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <CardTitle>All Adjustments</CardTitle>
+          <Input
+            value={adjustmentSearch}
+            onChange={(e) => setAdjustmentSearch(e.target.value)}
+            placeholder="Search adjustments..."
+            className="h-9 w-full sm:w-56"
+          />
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Date</TableHead>
-                <TableHead>Card Type</TableHead>
+                <TableHead>Item Type</TableHead>
                 <TableHead>Adjustment</TableHead>
                 <TableHead>User</TableHead>
                 <TableHead>Reason</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {adjustments?.adjustments?.map((adj: any) => (
-                <TableRow key={adj.id}>
-                  <TableCell>
-                    {format(new Date(adj.createdAt), "MMM d, yyyy HH:mm")}
-                  </TableCell>
-                  <TableCell className="font-medium">
-                    {adj.cardType.name}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={adj.qty > 0 ? "default" : "destructive"}>
-                      {adj.qty > 0 ? "+" : ""}
-                      {adj.qty.toLocaleString()}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {adj.createdBy
-                      ? `${adj.createdBy.firstName} ${adj.createdBy.lastName}`
-                      : "System"}
-                  </TableCell>
-                  <TableCell className="max-w-xs truncate">
-                    {adj.notes || "-"}
+              {filteredAdjustments.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={5}
+                    className="text-center py-8 text-muted-foreground"
+                  >
+                    {normalizedAdjustmentSearch
+                      ? "No matching adjustments"
+                      : "No adjustments available"}
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : (
+                filteredAdjustments.map((adj: any) => (
+                  <TableRow key={adj.id}>
+                    <TableCell>
+                      {format(new Date(adj.createdAt), "MMM d, yyyy HH:mm")}
+                    </TableCell>
+                    <TableCell className="font-medium">
+                      {adj.itemType?.name ?? "-"}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={adj.qty > 0 ? "default" : "destructive"}>
+                        {adj.qty > 0 ? "+" : ""}
+                        {adj.qty.toLocaleString()}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {adj.createdBy
+                        ? `${adj.createdBy.firstName} ${adj.createdBy.lastName}`
+                        : "System"}
+                    </TableCell>
+                    <TableCell className="max-w-xs truncate">
+                      {adj.notes || "-"}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { PageHeader } from "components/ui/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "components/ui/card";
@@ -22,27 +22,38 @@ import {
 } from "components/ui/file-upload-area";
 import { useToast } from "components/ui/toast-provider";
 import { apiRequest, apiFormData } from "services/api";
-import { useSystemCopy } from "lib/system-mode";
+import { useSystemCopy, useSystemMode } from "lib/system-mode";
+
+type ItemType = {
+  id: number;
+  name: string;
+  code: string;
+};
 
 export default function ReceiveForm() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const copy = useSystemCopy();
+  const { mode } = useSystemMode();
   const [files, setFiles] = useState<FileWithMetadata[]>([]);
   const [formData, setFormData] = useState({
-    cardTypeId: "",
+    itemTypeId: "",
     batchCode: "",
     qtyReceived: "",
     receivedAt: new Date().toISOString().split("T")[0],
     notes: "",
   });
 
-  // Hardcoded card types
-  const cardTypes = [
-    { id: 1, name: "Zim-Switch", code: "ZIM-SWITCH" },
-    { id: 2, name: "Visa", code: "VISA" },
-  ];
+  const { data: itemTypes = [], isLoading: isLoadingItemTypes } = useQuery<ItemType[]>({
+    queryKey: ["item-types", mode],
+    queryFn: async () => {
+      const response = await apiRequest<{ itemTypes: ItemType[] }>(
+        "/api/item-types",
+      );
+      return response.itemTypes;
+    },
+  });
 
   const receiveMutation = useMutation({
     mutationFn: async (data: FormData) => {
@@ -68,7 +79,7 @@ export default function ReceiveForm() {
 
     // Create receive transaction with files
     const submitFormData = new FormData();
-    submitFormData.append("cardTypeId", formData.cardTypeId);
+    submitFormData.append("itemTypeId", formData.itemTypeId);
     submitFormData.append("batchCode", formData.batchCode);
     submitFormData.append("qtyReceived", formData.qtyReceived);
     if (formData.receivedAt) {
@@ -78,7 +89,6 @@ export default function ReceiveForm() {
     if (formData.notes) {
       submitFormData.append("notes", formData.notes);
     }
-    // Removed unitCost and totalCost from submission
     // Append files directly - the backend will handle upload
     files.forEach((fileWithMeta) => {
       submitFormData.append("files", fileWithMeta.file);
@@ -102,11 +112,11 @@ export default function ReceiveForm() {
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid gap-6 md:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="cardTypeId">{copy.itemTypeLabel} *</Label>
+                <Label htmlFor="itemTypeId">{copy.itemTypeLabel} *</Label>
                 <Select
-                  value={formData.cardTypeId}
+                  value={formData.itemTypeId}
                   onValueChange={(value) =>
-                    setFormData({ ...formData, cardTypeId: value })
+                    setFormData({ ...formData, itemTypeId: value })
                   }
                   required
                 >
@@ -114,11 +124,21 @@ export default function ReceiveForm() {
                     <SelectValue placeholder={copy.itemTypePlaceholder} />
                   </SelectTrigger>
                   <SelectContent>
-                    {Array.isArray(cardTypes) && cardTypes.map((type) => (
-                      <SelectItem key={type.id} value={type.id.toString()}>
-                        {type.name} ({type.code})
+                    {isLoadingItemTypes ? (
+                      <SelectItem value="loading" disabled>
+                        Loading item types...
                       </SelectItem>
-                    ))}
+                    ) : itemTypes.length === 0 ? (
+                      <SelectItem value="empty" disabled>
+                        No item types available
+                      </SelectItem>
+                    ) : (
+                      itemTypes.map((type) => (
+                        <SelectItem key={type.id} value={type.id.toString()}>
+                          {type.name} ({type.code})
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -162,8 +182,6 @@ export default function ReceiveForm() {
                   required
                 />
               </div>
-
-              {/* Unit Cost and Total Cost fields removed */}
             </div>
 
             <div className="space-y-2">

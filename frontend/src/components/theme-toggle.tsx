@@ -5,7 +5,7 @@ import { Moon, Sun } from "lucide-react";
 import { Button } from "components/ui/button";
 import { cn } from "lib/utils";
 
-const THEME_STORAGE_KEY = "omacard-theme";
+const THEME_STORAGE_KEY = "omari-theme";
 
 type ThemeMode = "light" | "dark";
 

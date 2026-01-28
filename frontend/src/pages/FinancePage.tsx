@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "components/ui/page-header";
 import { StatCard } from "components/ui/stat-card";
@@ -39,7 +39,7 @@ import {
 } from "lucide-react";
 import { apiRequest } from "services/api";
 import { format } from "date-fns";
-import { useSystemCopy } from "lib/system-mode";
+import { useSystemCopy, useSystemMode } from "lib/system-mode";
 import {
   BarChart,
   Bar,
@@ -52,7 +52,7 @@ import {
 } from "recharts";
 import type { TooltipProps } from "recharts";
 
-const ALL_CARD_OPTION = "ALL_CARD_TYPES";
+const ALL_ITEM_OPTION = "ALL_ITEM_TYPES";
 
 type FinanceData = {
   totals: {
@@ -67,8 +67,8 @@ type FinanceData = {
     outstandingInventoryQty: number;
     estimatedInventoryValue: number;
   };
-  byCardType: Array<{
-    cardType: { id: number; name: string; code: string };
+  byItemType: Array<{
+    itemType: { id: number; name: string; code: string };
     receivedQty: number;
     receivedCost: number;
     issuedQty: number;
@@ -89,7 +89,8 @@ type FinanceData = {
     receipts: Array<{
       id: number;
       type: "RECEIVE";
-      cardType: { id: number; name: string; code: string };
+      itemType: { id: number; name: string; code: string };
+      status: "COMPLETED" | "REVERSED";
       qty: number;
       unitCost: number | null;
       totalCost: number | null;
@@ -99,7 +100,8 @@ type FinanceData = {
     issues: Array<{
       id: number;
       type: "ISSUE";
-      cardType: { id: number; name: string; code: string };
+      itemType: { id: number; name: string; code: string };
+      status: "COMPLETED" | "REVERSED";
       qty: number;
       unitPrice: number | null;
       totalPrice: number | null;
@@ -109,7 +111,7 @@ type FinanceData = {
   };
 };
 
-type CardType = {
+type ItemType = {
   id: number;
   name: string;
   code: string;
@@ -120,29 +122,33 @@ export default function DashboardPage() {
   const queryClient = useQueryClient();
   const hasAccess = true;
   const copy = useSystemCopy();
+  const { mode } = useSystemMode();
 
   const [dateRange, setDateRange] = useState({
     startDate: "",
     endDate: "",
   });
-  const [cardTypeFilter, setCardTypeFilter] = useState("");
+  const [itemTypeFilter, setItemTypeFilter] = useState("");
+  const [byItemTypeSearch, setByItemTypeSearch] = useState("");
+  const [transactionsSearch, setTransactionsSearch] = useState("");
 
   // Editing state
   const [editingTransaction, setEditingTransaction] = useState<{
     id: number;
     type: "RECEIVE" | "ISSUE";
+    qty: string;
     unitValue: string;
     totalValue: string;
   } | null>(null);
 
-  // Fetch card types for filter
-  const { data: cardTypes = [] } = useQuery<CardType[]>({
-    queryKey: ["card-types"],
+  // Fetch item types for filter
+  const { data: itemTypes = [] } = useQuery<ItemType[]>({
+    queryKey: ["item-types", mode],
     queryFn: async () => {
-      const response = await apiRequest<{ cardTypes: CardType[] }>(
-        "/api/card-types",
+      const response = await apiRequest<{ itemTypes: ItemType[] }>(
+        "/api/item-types",
       );
-      return response.cardTypes;
+      return response.itemTypes;
     },
     enabled: hasAccess,
   });
@@ -152,35 +158,44 @@ export default function DashboardPage() {
     const params = new URLSearchParams();
     if (dateRange.startDate) params.append("startDate", dateRange.startDate);
     if (dateRange.endDate) params.append("endDate", dateRange.endDate);
-    if (cardTypeFilter && cardTypeFilter !== ALL_CARD_OPTION) {
-      params.append("cardTypeId", cardTypeFilter);
+    if (itemTypeFilter && itemTypeFilter !== ALL_ITEM_OPTION) {
+      params.append("itemTypeId", itemTypeFilter);
     }
     return params.toString();
-  }, [dateRange, cardTypeFilter]);
+  }, [dateRange, itemTypeFilter]);
 
   // Fetch finance data
   const { data: financeData, isLoading } = useQuery({
-    queryKey: ["finance-data", queryParams],
+    queryKey: ["finance-data", queryParams, mode],
     queryFn: () =>
       apiRequest<FinanceData>(`/api/reports/finance?${queryParams}`),
     enabled: hasAccess,
     refetchInterval: 30000, // Refresh every 30 seconds for real-time view
   });
 
+  useEffect(() => {
+    setItemTypeFilter("");
+  }, [mode]);
+
   // Update transaction mutation
   const updateMutation = useMutation({
     mutationFn: async ({
       id,
       type,
+      qty,
       unitValue,
       totalValue,
     }: {
       id: number;
       type: "RECEIVE" | "ISSUE";
+      qty: string;
       unitValue: string;
       totalValue: string;
     }) => {
       const payload: Record<string, number | null> = {};
+      if (qty) {
+        payload.qty = parseFloat(qty);
+      }
       if (type === "RECEIVE") {
         payload.unitCost = unitValue ? parseFloat(unitValue) : null;
         payload.totalCost = totalValue ? parseFloat(totalValue) : null;
@@ -195,6 +210,11 @@ export default function DashboardPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["finance-data"] });
+      queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["stock-balance"] });
+      queryClient.invalidateQueries({ queryKey: ["issues-report"] });
+      queryClient.invalidateQueries({ queryKey: ["receipts-report"] });
+      queryClient.invalidateQueries({ queryKey: ["user-activity-report"] });
       setEditingTransaction(null);
     },
   });
@@ -205,6 +225,27 @@ export default function DashboardPage() {
       style: "currency",
       currency: "USD",
     }).format(value);
+  };
+
+  const parseNumber = (value: string | number) => {
+    if (!value) return null;
+    const num = Number(value);
+    return Number.isFinite(num) ? num : null;
+  };
+
+  const formatMoneyInput = (value: number | null) =>
+    value == null ? "" : value.toFixed(2);
+
+  const syncTotalFromUnit = (unitValue: string, qty: number) => {
+    const unit = parseNumber(unitValue);
+    if (unit == null || qty <= 0) return "";
+    return formatMoneyInput(unit * qty);
+  };
+
+  const syncUnitFromTotal = (totalValue: string, qty: number) => {
+    const total = parseNumber(totalValue);
+    if (total == null || qty <= 0) return "";
+    return formatMoneyInput(total / qty);
   };
 
   const formatNumber = (value: number) => {
@@ -269,7 +310,7 @@ export default function DashboardPage() {
   }
 
   const totals = financeData?.totals;
-  const byCardType = financeData?.byCardType || [];
+  const byItemType = financeData?.byItemType || [];
   const chartData = financeData?.chartData || [];
   const recentReceipts = financeData?.recent?.receipts || [];
   const recentIssues = financeData?.recent?.issues || [];
@@ -281,6 +322,54 @@ export default function DashboardPage() {
   ].sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   );
+
+  const normalizedByItemTypeSearch = byItemTypeSearch.trim().toLowerCase();
+  const filteredByItemType = normalizedByItemTypeSearch
+    ? byItemType.filter((item) => {
+        const haystack = [
+          item.itemType?.name,
+          item.itemType?.code,
+          item.receivedQty,
+          item.issuedQty,
+          item.balance,
+          item.receivedCost,
+          item.issuedRevenue,
+          item.profit,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        return haystack.includes(normalizedByItemTypeSearch);
+      })
+    : byItemType;
+
+  const normalizedTransactionsSearch = transactionsSearch.trim().toLowerCase();
+  const filteredRecentTransactions = normalizedTransactionsSearch
+    ? recentTransactions.filter((txn) => {
+        const unitValue =
+          txn.type === "RECEIVE"
+            ? (txn as any).unitCost
+            : (txn as any).unitPrice;
+        const totalValue =
+          txn.type === "RECEIVE"
+            ? (txn as any).totalCost ?? (txn as any).calculatedTotalCost
+            : (txn as any).totalPrice ?? (txn as any).calculatedTotalPrice;
+        const haystack = [
+          txn.id,
+          txn.type,
+          txn.itemType?.name,
+          txn.itemType?.code,
+          txn.qty,
+          unitValue,
+          totalValue,
+          txn.createdAt,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        return haystack.includes(normalizedTransactionsSearch);
+      })
+    : recentTransactions;
 
   return (
     <div className="space-y-6">
@@ -319,16 +408,16 @@ export default function DashboardPage() {
               />
             </div>
             <div>
-              <Label htmlFor="cardType">{copy.itemTypeLabel}</Label>
-              <Select value={cardTypeFilter} onValueChange={setCardTypeFilter}>
-                <SelectTrigger id="cardType">
+              <Label htmlFor="itemType">{copy.itemTypeLabel}</Label>
+              <Select value={itemTypeFilter} onValueChange={setItemTypeFilter}>
+                <SelectTrigger id="itemType">
                   <SelectValue placeholder={copy.itemTypeAllLabel} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={ALL_CARD_OPTION}>
+                  <SelectItem value={ALL_ITEM_OPTION}>
                     {copy.itemTypeAllLabel}
                   </SelectItem>
-                  {cardTypes.map((type) => (
+                  {itemTypes.map((type) => (
                     <SelectItem key={type.id} value={type.id.toString()}>
                       {type.name}
                     </SelectItem>
@@ -341,7 +430,7 @@ export default function DashboardPage() {
                 variant="outline"
                 onClick={() => {
                   setDateRange({ startDate: "", endDate: "" });
-                  setCardTypeFilter("");
+                  setItemTypeFilter("");
                 }}
               >
                 Clear Filters
@@ -454,13 +543,19 @@ export default function DashboardPage() {
           </Card>
         </TabsContent>
 
-        {/* By Card Type Tab */}
+        {/* By Item Type Tab */}
         <TabsContent value="by-card-type">
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <CardTitle>
                 Financial Summary by {copy.itemTypeLabel}
               </CardTitle>
+              <Input
+                value={byItemTypeSearch}
+                onChange={(e) => setByItemTypeSearch(e.target.value)}
+                placeholder={`Search ${copy.itemTypeLabel.toLowerCase()}...`}
+                className="h-9 w-full sm:w-60"
+              />
             </CardHeader>
             <CardContent>
               <Table>
@@ -478,19 +573,21 @@ export default function DashboardPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {byCardType.length === 0 ? (
+                  {filteredByItemType.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={9} className="text-center py-8">
-                        No data available
+                        {normalizedByItemTypeSearch
+                          ? "No matching results"
+                          : "No data available"}
                       </TableCell>
                     </TableRow>
                   ) : (
-                    byCardType.map((item) => (
-                      <TableRow key={item.cardType.id}>
+                    filteredByItemType.map((item) => (
+                      <TableRow key={item.itemType.id}>
                         <TableCell className="font-medium">
-                          {item.cardType.name}
+                          {item.itemType.name}
                           <span className="text-muted-foreground text-xs ml-1">
-                            ({item.cardType.code})
+                            ({item.itemType.code})
                           </span>
                         </TableCell>
                         <TableCell className="text-right">
@@ -535,8 +632,14 @@ export default function DashboardPage() {
         {/* Recent Transactions Tab */}
         <TabsContent value="transactions">
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <CardTitle>Recent Transactions (Edit Financial Values)</CardTitle>
+              <Input
+                value={transactionsSearch}
+                onChange={(e) => setTransactionsSearch(e.target.value)}
+                placeholder="Search transactions..."
+                className="h-9 w-full sm:w-64"
+              />
             </CardHeader>
             <CardContent>
               <Table>
@@ -553,15 +656,18 @@ export default function DashboardPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {recentTransactions.length === 0 ? (
+                  {filteredRecentTransactions.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={8} className="text-center py-8">
-                        No recent transactions
+                        {normalizedTransactionsSearch
+                          ? "No matching transactions"
+                          : "No recent transactions"}
                       </TableCell>
                     </TableRow>
                   ) : (
-                    recentTransactions.map((txn) => {
+                    filteredRecentTransactions.map((txn) => {
                       const isEditing = editingTransaction?.id === txn.id;
+                      const isReversed = txn.status === "REVERSED";
                       const unitValue =
                         txn.type === "RECEIVE"
                           ? (txn as any).unitCost
@@ -570,6 +676,9 @@ export default function DashboardPage() {
                         txn.type === "RECEIVE"
                           ? (txn as any).calculatedTotalCost
                           : (txn as any).calculatedTotalPrice;
+                      const currentQty = isEditing
+                        ? parseNumber(editingTransaction.qty) || 0
+                        : txn.qty;
 
                       return (
                         <TableRow key={`${txn.type}-${txn.id}`}>
@@ -583,9 +692,44 @@ export default function DashboardPage() {
                               {txn.type}
                             </Badge>
                           </TableCell>
-                          <TableCell>{txn.cardType.name}</TableCell>
+                          <TableCell>{txn.itemType.name}</TableCell>
                           <TableCell className="text-right">
-                            {formatNumber(txn.qty)}
+                            {isEditing ? (
+                              <Input
+                                type="number"
+                                min="1"
+                                value={editingTransaction.qty}
+                                onChange={(e) =>
+                                  setEditingTransaction((prev) => {
+                                    if (!prev) return null;
+                                    const nextQtyValue = e.target.value;
+                                    const nextQty = parseNumber(nextQtyValue) || 0;
+                                    let nextUnit = prev.unitValue;
+                                    let nextTotal = prev.totalValue;
+                                    if (prev.unitValue) {
+                                      nextTotal = syncTotalFromUnit(
+                                        prev.unitValue,
+                                        nextQty,
+                                      );
+                                    } else if (prev.totalValue) {
+                                      nextUnit = syncUnitFromTotal(
+                                        prev.totalValue,
+                                        nextQty,
+                                      );
+                                    }
+                                    return {
+                                      ...prev,
+                                      qty: nextQtyValue,
+                                      unitValue: nextUnit,
+                                      totalValue: nextTotal,
+                                    };
+                                  })
+                                }
+                                className="w-20 text-right"
+                              />
+                            ) : (
+                              formatNumber(txn.qty)
+                            )}
                           </TableCell>
                           <TableCell className="text-right">
                             {isEditing ? (
@@ -597,7 +741,14 @@ export default function DashboardPage() {
                                 onChange={(e) =>
                                   setEditingTransaction((prev) =>
                                     prev
-                                      ? { ...prev, unitValue: e.target.value }
+                                      ? {
+                                          ...prev,
+                                          unitValue: e.target.value,
+                                          totalValue: syncTotalFromUnit(
+                                            e.target.value,
+                                            currentQty,
+                                          ),
+                                        }
                                       : null
                                   )
                                 }
@@ -617,7 +768,14 @@ export default function DashboardPage() {
                                 onChange={(e) =>
                                   setEditingTransaction((prev) =>
                                     prev
-                                      ? { ...prev, totalValue: e.target.value }
+                                      ? {
+                                          ...prev,
+                                          totalValue: e.target.value,
+                                          unitValue: syncUnitFromTotal(
+                                            e.target.value,
+                                            currentQty,
+                                          ),
+                                        }
                                       : null
                                   )
                                 }
@@ -641,6 +799,7 @@ export default function DashboardPage() {
                                     updateMutation.mutate({
                                       id: editingTransaction.id,
                                       type: editingTransaction.type,
+                                      qty: editingTransaction.qty,
                                       unitValue: editingTransaction.unitValue,
                                       totalValue: editingTransaction.totalValue,
                                     })
@@ -661,7 +820,9 @@ export default function DashboardPage() {
                               <Button
                                 size="sm"
                                 variant="ghost"
+                                disabled={isReversed}
                                 onClick={() => {
+                                  if (isReversed) return;
                                   const rawUnit =
                                     txn.type === "RECEIVE"
                                       ? (txn as any).unitCost
@@ -670,13 +831,23 @@ export default function DashboardPage() {
                                     txn.type === "RECEIVE"
                                       ? (txn as any).totalCost
                                       : (txn as any).totalPrice;
+                                  const initialQty = String(txn.qty);
+                                  const initialTotal =
+                                    rawTotal !== null
+                                      ? String(rawTotal)
+                                      : rawUnit !== null
+                                        ? syncTotalFromUnit(
+                                            String(rawUnit),
+                                            txn.qty,
+                                          )
+                                        : "";
                                   setEditingTransaction({
                                     id: txn.id,
                                     type: txn.type,
+                                    qty: initialQty,
                                     unitValue:
                                       rawUnit !== null ? String(rawUnit) : "",
-                                    totalValue:
-                                      rawTotal !== null ? String(rawTotal) : "",
+                                    totalValue: initialTotal,
                                   });
                                 }}
                               >

@@ -21,7 +21,6 @@ type ValueForm = {
   totalCost: string;
   unitPrice: string;
   totalPrice: string;
-  qty?: string;
 };
 
 type TransactionDetailDialogProps = {
@@ -50,6 +49,50 @@ export default function TransactionDetailDialog({
   getTypeBadgeVariant,
 }: TransactionDetailDialogProps) {
   const copy = useSystemCopy();
+  const isReversed = selectedTransaction?.status === "REVERSED";
+  const allowEdit = canEditFinancials && !isReversed;
+
+  const parseNumber = (value: string) => {
+    if (!value) return null;
+    const num = Number(value);
+    return Number.isFinite(num) ? num : null;
+  };
+
+  const formatMoney = (value: number) => value.toFixed(2);
+
+  const syncReceiveCosts = (next: ValueForm, source: "unitCost" | "totalCost") => {
+    const qty = Number(selectedTransaction?.qty || 0);
+    if (!qty || qty <= 0) {
+      if (source === "unitCost") next.totalCost = "";
+      if (source === "totalCost") next.unitCost = "";
+      return next;
+    }
+    if (source === "unitCost") {
+      const unit = parseNumber(next.unitCost);
+      next.totalCost = unit != null ? formatMoney(unit * qty) : "";
+    } else {
+      const total = parseNumber(next.totalCost);
+      next.unitCost = total != null ? formatMoney(total / qty) : "";
+    }
+    return next;
+  };
+
+  const syncIssuePrices = (next: ValueForm, source: "unitPrice" | "totalPrice") => {
+    const qty = Number(selectedTransaction?.qty || 0);
+    if (!qty || qty <= 0) {
+      if (source === "unitPrice") next.totalPrice = "";
+      if (source === "totalPrice") next.unitPrice = "";
+      return next;
+    }
+    if (source === "unitPrice") {
+      const unit = parseNumber(next.unitPrice);
+      next.totalPrice = unit != null ? formatMoney(unit * qty) : "";
+    } else {
+      const total = parseNumber(next.totalPrice);
+      next.unitPrice = total != null ? formatMoney(total / qty) : "";
+    }
+    return next;
+  };
   return (
     <Dialog
       open={!!selectedTransaction}
@@ -86,30 +129,14 @@ export default function TransactionDetailDialog({
                   {copy.itemTypeLabel}
                 </Label>
                 <p className="font-medium">
-                  {selectedTransaction.cardType.name}
+                  {selectedTransaction.itemType?.name ?? "-"}
                 </p>
               </div>
               <div>
-                <Label className="text-xs text-muted-foreground" htmlFor="finance-qty">Quantity</Label>
-                {canEditFinancials ? (
-                  <Input
-                    id="finance-qty"
-                    type="number"
-                    min="1"
-                    value={valueForm.qty ?? selectedTransaction.qty}
-                    onChange={(e) =>
-                      setValueForm((prev) => ({
-                        ...prev,
-                        qty: e.target.value,
-                      }))
-                    }
-                    placeholder="e.g. 100"
-                  />
-                ) : (
-                  <p className="font-medium">
-                    {selectedTransaction.qty.toLocaleString()}
-                  </p>
-                )}
+                <Label className="text-xs text-muted-foreground">Quantity</Label>
+                <p className="font-medium">
+                  {selectedTransaction.qty.toLocaleString()}
+                </p>
               </div>
               <div>
                 <Label className="text-xs text-muted-foreground">Date</Label>
@@ -125,20 +152,16 @@ export default function TransactionDetailDialog({
                     : "System"}
                 </p>
               </div>
-              {selectedTransaction.issuedToName && (
+              {(selectedTransaction.issuedToBranch || selectedTransaction.issuedToName) && (
                 <>
                   <div>
                     <Label className="text-xs text-muted-foreground">
-                      Issued To Type
+                      Issued To
                     </Label>
                     <p className="font-medium">
-                      {selectedTransaction.issuedToType}
-                    </p>
-                  </div>
-                  <div>
-                    <Label className="text-xs text-muted-foreground">Recipient</Label>
-                    <p className="font-medium">
-                      {selectedTransaction.issuedToName}
+                      {selectedTransaction.issuedToBranch
+                        ? `Branch • ${selectedTransaction.issuedToBranch.name}`
+                        : selectedTransaction.issuedToName}
                     </p>
                   </div>
                 </>
@@ -179,7 +202,7 @@ export default function TransactionDetailDialog({
                         : `Capture the per-${copy.unitNoun} price and total issuance value.`}
                     </p>
                   </div>
-                  {canEditFinancials && (
+                  {allowEdit && (
                     <Button
                       size="sm"
                       onClick={handleSaveFinancials}
@@ -199,7 +222,7 @@ export default function TransactionDetailDialog({
                         >
                           Unit Cost
                         </Label>
-                        {canEditFinancials ? (
+                        {allowEdit ? (
                           <Input
                             id="finance-unit-cost"
                             type="number"
@@ -207,10 +230,12 @@ export default function TransactionDetailDialog({
                             step="0.01"
                             value={valueForm.unitCost}
                             onChange={(e) =>
-                              setValueForm((prev) => ({
-                                ...prev,
-                                unitCost: e.target.value,
-                              }))
+                              setValueForm((prev) =>
+                                syncReceiveCosts(
+                                  { ...prev, unitCost: e.target.value },
+                                  "unitCost",
+                                ),
+                              )
                             }
                             placeholder="e.g. 2.50"
                           />
@@ -227,7 +252,7 @@ export default function TransactionDetailDialog({
                         >
                           Total Cost
                         </Label>
-                        {canEditFinancials ? (
+                        {allowEdit ? (
                           <Input
                             id="finance-total-cost"
                             type="number"
@@ -235,10 +260,12 @@ export default function TransactionDetailDialog({
                             step="0.01"
                             value={valueForm.totalCost}
                             onChange={(e) =>
-                              setValueForm((prev) => ({
-                                ...prev,
-                                totalCost: e.target.value,
-                              }))
+                              setValueForm((prev) =>
+                                syncReceiveCosts(
+                                  { ...prev, totalCost: e.target.value },
+                                  "totalCost",
+                                ),
+                              )
                             }
                             placeholder="Optional"
                           />
@@ -258,7 +285,7 @@ export default function TransactionDetailDialog({
                         >
                           Unit Price
                         </Label>
-                        {canEditFinancials ? (
+                        {allowEdit ? (
                           <Input
                             id="finance-unit-price"
                             type="number"
@@ -266,10 +293,12 @@ export default function TransactionDetailDialog({
                             step="0.01"
                             value={valueForm.unitPrice}
                             onChange={(e) =>
-                              setValueForm((prev) => ({
-                                ...prev,
-                                unitPrice: e.target.value,
-                              }))
+                              setValueForm((prev) =>
+                                syncIssuePrices(
+                                  { ...prev, unitPrice: e.target.value },
+                                  "unitPrice",
+                                ),
+                              )
                             }
                             placeholder="e.g. 5.00"
                           />
@@ -286,7 +315,7 @@ export default function TransactionDetailDialog({
                         >
                           Total Price
                         </Label>
-                        {canEditFinancials ? (
+                        {allowEdit ? (
                           <Input
                             id="finance-total-price"
                             type="number"
@@ -294,10 +323,12 @@ export default function TransactionDetailDialog({
                             step="0.01"
                             value={valueForm.totalPrice}
                             onChange={(e) =>
-                              setValueForm((prev) => ({
-                                ...prev,
-                                totalPrice: e.target.value,
-                              }))
+                              setValueForm((prev) =>
+                                syncIssuePrices(
+                                  { ...prev, totalPrice: e.target.value },
+                                  "totalPrice",
+                                ),
+                              )
                             }
                             placeholder="Optional"
                           />
@@ -310,10 +341,14 @@ export default function TransactionDetailDialog({
                     </>
                   )}
                 </div>
-                {canEditFinancials && (
+                {allowEdit && (
                   <p className="mt-3 text-xs text-muted-foreground">
-                    Leave a field blank to clear it. Totals are auto-calculated
-                    when only a unit value is provided.
+                    Totals stay in sync with unit values and quantity.
+                  </p>
+                )}
+                {isReversed && (
+                  <p className="mt-3 text-xs text-red-600 dark:text-red-400">
+                    This transaction is reversed and cannot be edited.
                   </p>
                 )}
               </div>

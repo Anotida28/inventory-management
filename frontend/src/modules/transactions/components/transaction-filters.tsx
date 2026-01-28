@@ -24,9 +24,9 @@ type TransactionFiltersProps = {
   onChange: (filters: TransactionFilters) => void;
   defaultFilters: TransactionFilters;
   typeOptions: FilterOption[];
-  cardTypeOptions: FilterOption[];
+  itemTypeOptions: FilterOption[];
   allTypeValue: string;
-  allCardTypeValue: string;
+  allItemTypeValue: string;
 };
 
 export default function TransactionFiltersPanel({
@@ -34,9 +34,9 @@ export default function TransactionFiltersPanel({
   onChange,
   defaultFilters,
   typeOptions,
-  cardTypeOptions,
+  itemTypeOptions,
   allTypeValue,
-  allCardTypeValue,
+  allItemTypeValue,
 }: TransactionFiltersProps) {
   const copy = useSystemCopy();
   const updateFilters = (patch: Partial<TransactionFilters>) => {
@@ -47,8 +47,8 @@ export default function TransactionFiltersPanel({
     updateFilters({ type: value === allTypeValue ? "" : value });
   };
 
-  const handleCardTypeChange = (value: string) => {
-    updateFilters({ cardTypeId: value === allCardTypeValue ? "" : value });
+  const handleItemTypeChange = (value: string) => {
+    updateFilters({ itemTypeId: value === allItemTypeValue ? "" : value });
   };
 
   const handleClear = () => {
@@ -84,14 +84,14 @@ export default function TransactionFiltersPanel({
           <div className="space-y-2">
             <Label>{copy.itemTypeLabel}</Label>
             <Select
-              value={filters.cardTypeId || allCardTypeValue}
-              onValueChange={handleCardTypeChange}
+              value={filters.itemTypeId || allItemTypeValue}
+              onValueChange={handleItemTypeChange}
             >
               <SelectTrigger>
                 <SelectValue placeholder={copy.itemTypeAllLabel} />
               </SelectTrigger>
               <SelectContent>
-                {cardTypeOptions.map((option) => (
+                {itemTypeOptions.map((option) => (
                   <SelectItem key={option.value} value={option.value}>
                     {option.label}
                   </SelectItem>

@@ -2,12 +2,21 @@ type UserRole = "ADMIN" | "CLERK" | "AUDITOR" | "FINANCE";
 type TransactionType = "RECEIVE" | "ISSUE" | "REVERSAL";
 type TransactionStatus = "COMPLETED" | "REVERSED";
 type IssuedToType = "BRANCH" | "PERSON";
+type SystemMode = "CARDS" | "INVENTORY";
 
-type CardType = {
+type ItemType = {
   id: number;
   name: string;
   code: string;
   description?: string | null;
+  isActive: boolean;
+};
+
+type Branch = {
+  id: number;
+  name: string;
+  code: string;
+  location?: string | null;
   isActive: boolean;
 };
 
@@ -24,7 +33,7 @@ type User = {
 
 type Batch = {
   id: number;
-  cardTypeId: number;
+  itemTypeId: number;
   batchCode: string;
   qtyReceived: number;
   qtyIssued: number;
@@ -43,13 +52,14 @@ type Attachment = {
 type Transaction = {
   id: number;
   type: TransactionType;
-  cardTypeId: number;
+  itemTypeId: number;
   qty: number;
   createdAt: string;
   createdById: number;
   status: TransactionStatus;
   issuedToType?: IssuedToType;
   issuedToName?: string;
+  issuedToBranchId?: number | null;
   batchId?: number | null;
   notes?: string | null;
   unitCost?: number | null;
@@ -59,39 +69,46 @@ type Transaction = {
   attachments?: Attachment[];
 };
 
+type ModeState = {
+  itemTypes: ItemType[];
+  batches: Batch[];
+  transactions: Transaction[];
+  nextIds: {
+    itemType: number;
+    batch: number;
+    transaction: number;
+  };
+};
+
 const daysAgo = (days: number) =>
   new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 
+const MODE_STORAGE_KEY = "omari.systemMode";
+
+const getActiveMode = (): SystemMode => {
+  if (typeof window === "undefined") return "CARDS";
+  try {
+    const globalMode = (window as unknown as Record<string, SystemMode>)[
+      "__OMARI_SYSTEM_MODE"
+    ];
+    if (globalMode === "CARDS" || globalMode === "INVENTORY") {
+      return globalMode;
+    }
+    const stored = window.localStorage.getItem(MODE_STORAGE_KEY);
+    return stored === "INVENTORY" ? "INVENTORY" : "CARDS";
+  } catch {
+    return "CARDS";
+  }
+};
+
 const state = {
-  cardTypes: [
-    {
-      id: 1,
-      name: "Visa Classic",
-      code: "VISA-STD",
-      description: "Standard Visa issuance stock",
-      isActive: true,
-    },
-    {
-      id: 2,
-      name: "Visa Premium",
-      code: "VISA-PRM",
-      description: "Premium Visa card program",
-      isActive: true,
-    },
-    {
-      id: 3,
-      name: "Mastercard Business",
-      code: "MC-BIZ",
-      description: "Commercial Mastercard program",
-      isActive: false,
-    },
-  ] as CardType[],
+  branches: [] as Branch[],
   users: [
     {
       id: 1,
       firstName: "System",
       lastName: "Administrator",
-      email: "admin@omacard.internal",
+      email: "admin@omari.internal",
       username: "admin",
       role: "ADMIN",
       isActive: true,
@@ -101,7 +118,7 @@ const state = {
       id: 2,
       firstName: "Nia",
       lastName: "Obi",
-      email: "nia.obi@omacard.internal",
+      email: "nia.obi@omari.internal",
       username: "nobi",
       role: "CLERK",
       isActive: true,
@@ -111,161 +128,384 @@ const state = {
       id: 3,
       firstName: "Ibrahim",
       lastName: "Toure",
-      email: "ibrahim.toure@omacard.internal",
+      email: "ibrahim.toure@omari.internal",
       username: "itoure",
       role: "FINANCE",
       isActive: true,
       lastLoginAt: daysAgo(2),
     },
   ] as User[],
-  batches: [
-    {
-      id: 1,
-      cardTypeId: 1,
-      batchCode: "BATCH-ALPHA",
-      qtyReceived: 1200,
-      qtyIssued: 320,
-      receivedAt: daysAgo(18),
-      notes: "Initial receipt",
+  modes: {
+    CARDS: {
+      itemTypes: [
+        {
+          id: 1,
+          name: "Visa Classic",
+          code: "VISA-STD",
+          description: "Standard Visa issuance stock",
+          isActive: true,
+        },
+        {
+          id: 2,
+          name: "Visa Premium",
+          code: "VISA-PRM",
+          description: "Premium Visa card program",
+          isActive: true,
+        },
+        {
+          id: 3,
+          name: "Mastercard Business",
+          code: "MC-BIZ",
+          description: "Commercial Mastercard program",
+          isActive: false,
+        },
+      ],
+      batches: [
+        {
+          id: 1,
+          itemTypeId: 1,
+          batchCode: "CARD-ALPHA",
+          qtyReceived: 1200,
+          qtyIssued: 320,
+          receivedAt: daysAgo(18),
+          notes: "Initial card receipt",
+        },
+        {
+          id: 2,
+          itemTypeId: 2,
+          batchCode: "CARD-BRAVO",
+          qtyReceived: 800,
+          qtyIssued: 150,
+          receivedAt: daysAgo(25),
+          notes: "Premium card inventory load",
+        },
+        {
+          id: 3,
+          itemTypeId: 3,
+          batchCode: "CARD-CHARLIE",
+          qtyReceived: 400,
+          qtyIssued: 120,
+          receivedAt: daysAgo(40),
+          notes: "Business program batch",
+        },
+      ],
+      transactions: [
+        {
+          id: 1,
+          type: "RECEIVE",
+          itemTypeId: 1,
+          qty: 1200,
+          createdAt: daysAgo(18),
+          createdById: 1,
+          status: "COMPLETED",
+          batchId: 1,
+          unitCost: 2.25,
+          totalCost: 2700,
+          notes: "Initial Visa Classic stock",
+        },
+        {
+          id: 2,
+          type: "ISSUE",
+          itemTypeId: 1,
+          qty: 320,
+          createdAt: daysAgo(10),
+          createdById: 2,
+          status: "COMPLETED",
+          issuedToType: "BRANCH",
+          issuedToName: "Main Branch",
+          batchId: 1,
+          unitPrice: 4.5,
+          totalPrice: 1440,
+          notes: "Quarterly branch issue",
+        },
+        {
+          id: 4,
+          type: "RECEIVE",
+          itemTypeId: 2,
+          qty: 800,
+          createdAt: daysAgo(25),
+          createdById: 1,
+          status: "COMPLETED",
+          batchId: 2,
+          unitCost: 3.1,
+          totalCost: 2480,
+          notes: "Premium batch replenishment",
+        },
+        {
+          id: 5,
+          type: "ISSUE",
+          itemTypeId: 2,
+          qty: 150,
+          createdAt: daysAgo(3),
+          createdById: 3,
+          status: "COMPLETED",
+          issuedToType: "PERSON",
+          issuedToName: "Regional Manager",
+          batchId: 2,
+          unitPrice: 5.2,
+          totalPrice: 780,
+          notes: "Executive allocation",
+        },
+        {
+          id: 6,
+          type: "RECEIVE",
+          itemTypeId: 3,
+          qty: 400,
+          createdAt: daysAgo(40),
+          createdById: 1,
+          status: "COMPLETED",
+          batchId: 3,
+          unitCost: 2.9,
+          totalCost: 1160,
+          notes: "Business program first shipment",
+        },
+        {
+          id: 7,
+          type: "ISSUE",
+          itemTypeId: 3,
+          qty: 120,
+          createdAt: daysAgo(15),
+          createdById: 2,
+          status: "COMPLETED",
+          issuedToType: "BRANCH",
+          issuedToName: "Enterprise Desk",
+          batchId: 3,
+          unitPrice: 4.9,
+          totalPrice: 588,
+          notes: "Business pilot allocation",
+        },
+      ],
+      nextIds: {
+        itemType: 4,
+        batch: 4,
+        transaction: 8,
+      },
     },
-    {
-      id: 2,
-      cardTypeId: 2,
-      batchCode: "BATCH-BRAVO",
-      qtyReceived: 800,
-      qtyIssued: 150,
-      receivedAt: daysAgo(25),
-      notes: "Premium inventory load",
+    INVENTORY: {
+      itemTypes: [
+        {
+          id: 1,
+          name: "Office Desk",
+          code: "DESK-OFC",
+          description: "Main office desks",
+          isActive: true,
+        },
+        {
+          id: 2,
+          name: "Ergonomic Chair",
+          code: "CHAIR-ERG",
+          description: "Ergo seating stock",
+          isActive: true,
+        },
+        {
+          id: 3,
+          name: "POS Terminal",
+          code: "POS-TERM",
+          description: "Point-of-sale terminals",
+          isActive: true,
+        },
+        {
+          id: 4,
+          name: "LED Monitor 24in",
+          code: "MON-24",
+          description: "24-inch LED monitors",
+          isActive: true,
+        },
+      ],
+      batches: [
+        {
+          id: 1,
+          itemTypeId: 1,
+          batchCode: "INV-DESK-01",
+          qtyReceived: 40,
+          qtyIssued: 12,
+          receivedAt: daysAgo(30),
+          notes: "Initial desk shipment",
+        },
+        {
+          id: 2,
+          itemTypeId: 2,
+          batchCode: "INV-CHAIR-01",
+          qtyReceived: 100,
+          qtyIssued: 60,
+          receivedAt: daysAgo(45),
+          notes: "Ergo chair intake",
+        },
+        {
+          id: 3,
+          itemTypeId: 3,
+          batchCode: "INV-POS-01",
+          qtyReceived: 25,
+          qtyIssued: 10,
+          receivedAt: daysAgo(20),
+          notes: "POS terminals batch",
+        },
+        {
+          id: 4,
+          itemTypeId: 4,
+          batchCode: "INV-MON-01",
+          qtyReceived: 60,
+          qtyIssued: 20,
+          receivedAt: daysAgo(12),
+          notes: "Monitor replenishment",
+        },
+      ],
+      transactions: [
+        {
+          id: 1,
+          type: "RECEIVE",
+          itemTypeId: 1,
+          qty: 40,
+          createdAt: daysAgo(30),
+          createdById: 1,
+          status: "COMPLETED",
+          batchId: 1,
+          unitCost: 85,
+          totalCost: 3400,
+          notes: "Office desks intake",
+        },
+        {
+          id: 2,
+          type: "ISSUE",
+          itemTypeId: 1,
+          qty: 12,
+          createdAt: daysAgo(14),
+          createdById: 2,
+          status: "COMPLETED",
+          issuedToType: "BRANCH",
+          issuedToName: "Bulawayo Branch",
+          batchId: 1,
+          unitPrice: 120,
+          totalPrice: 1440,
+          notes: "Front office setup",
+        },
+        {
+          id: 3,
+          type: "RECEIVE",
+          itemTypeId: 2,
+          qty: 100,
+          createdAt: daysAgo(45),
+          createdById: 1,
+          status: "COMPLETED",
+          batchId: 2,
+          unitCost: 45,
+          totalCost: 4500,
+          notes: "Ergonomic chairs delivery",
+        },
+        {
+          id: 4,
+          type: "ISSUE",
+          itemTypeId: 2,
+          qty: 60,
+          createdAt: daysAgo(20),
+          createdById: 3,
+          status: "COMPLETED",
+          issuedToType: "BRANCH",
+          issuedToName: "Harare HQ",
+          batchId: 2,
+          unitPrice: 65,
+          totalPrice: 3900,
+          notes: "Operations floor seating",
+        },
+        {
+          id: 5,
+          type: "RECEIVE",
+          itemTypeId: 3,
+          qty: 25,
+          createdAt: daysAgo(20),
+          createdById: 1,
+          status: "COMPLETED",
+          batchId: 3,
+          unitCost: 220,
+          totalCost: 5500,
+          notes: "POS terminals received",
+        },
+        {
+          id: 6,
+          type: "ISSUE",
+          itemTypeId: 3,
+          qty: 10,
+          createdAt: daysAgo(7),
+          createdById: 2,
+          status: "COMPLETED",
+          issuedToType: "BRANCH",
+          issuedToName: "Mutare Branch",
+          batchId: 3,
+          unitPrice: 310,
+          totalPrice: 3100,
+          notes: "POS rollout phase 1",
+        },
+        {
+          id: 7,
+          type: "RECEIVE",
+          itemTypeId: 4,
+          qty: 60,
+          createdAt: daysAgo(12),
+          createdById: 1,
+          status: "COMPLETED",
+          batchId: 4,
+          unitCost: 95,
+          totalCost: 5700,
+          notes: "Monitor restock",
+        },
+        {
+          id: 8,
+          type: "ISSUE",
+          itemTypeId: 4,
+          qty: 20,
+          createdAt: daysAgo(5),
+          createdById: 3,
+          status: "COMPLETED",
+          issuedToType: "BRANCH",
+          issuedToName: "Gweru Branch",
+          batchId: 4,
+          unitPrice: 135,
+          totalPrice: 2700,
+          notes: "Branch workstation upgrade",
+        },
+      ],
+      nextIds: {
+        itemType: 5,
+        batch: 5,
+        transaction: 9,
+      },
     },
-    {
-      id: 3,
-      cardTypeId: 3,
-      batchCode: "BATCH-CHARLIE",
-      qtyReceived: 400,
-      qtyIssued: 120,
-      receivedAt: daysAgo(40),
-      notes: "Business program batch",
-    },
-  ] as Batch[],
-  transactions: [
-    {
-      id: 1,
-      type: "RECEIVE",
-      cardTypeId: 1,
-      qty: 1200,
-      createdAt: daysAgo(18),
-      createdById: 1,
-      status: "COMPLETED",
-      batchId: 1,
-      unitCost: 2.25,
-      totalCost: 2700,
-      notes: "Initial Visa Classic stock",
-    },
-    {
-      id: 2,
-      type: "ISSUE",
-      cardTypeId: 1,
-      qty: 320,
-      createdAt: daysAgo(10),
-      createdById: 2,
-      status: "COMPLETED",
-      issuedToType: "BRANCH",
-      issuedToName: "Main Branch",
-      batchId: 1,
-      unitPrice: 4.5,
-      totalPrice: 1440,
-      notes: "Quarterly branch issue",
-    },
-    {
-      // Adjustment transaction removed
-    },
-    {
-      id: 4,
-      type: "RECEIVE",
-      cardTypeId: 2,
-      qty: 800,
-      createdAt: daysAgo(25),
-      createdById: 1,
-      status: "COMPLETED",
-      batchId: 2,
-      unitCost: 3.1,
-      totalCost: 2480,
-      notes: "Premium batch replenishment",
-    },
-    {
-      id: 5,
-      type: "ISSUE",
-      cardTypeId: 2,
-      qty: 150,
-      createdAt: daysAgo(3),
-      createdById: 3,
-      status: "COMPLETED",
-      issuedToType: "PERSON",
-      issuedToName: "Regional Manager",
-      batchId: 2,
-      unitPrice: 5.2,
-      totalPrice: 780,
-      notes: "Executive allocation",
-    },
-    {
-      id: 6,
-      type: "RECEIVE",
-      cardTypeId: 3,
-      qty: 400,
-      createdAt: daysAgo(40),
-      createdById: 1,
-      status: "COMPLETED",
-      batchId: 3,
-      unitCost: 2.9,
-      totalCost: 1160,
-      notes: "Business program first shipment",
-    },
-    {
-      id: 7,
-      type: "ISSUE",
-      cardTypeId: 3,
-      qty: 120,
-      createdAt: daysAgo(15),
-      createdById: 2,
-      status: "COMPLETED",
-      issuedToType: "BRANCH",
-      issuedToName: "Enterprise Desk",
-      batchId: 3,
-      unitPrice: 4.9,
-      totalPrice: 588,
-      notes: "Business pilot allocation",
-    },
-  ] as Transaction[],
+  } as Record<SystemMode, ModeState>,
   nextIds: {
-    cardType: 4,
     user: 4,
-    batch: 4,
-    transaction: 8,
   },
 };
 
-const getCardType = (id: number) =>
-  state.cardTypes.find((cardType) => cardType.id === id) || null;
+const getActiveState = () => state.modes[getActiveMode()];
+
+const getItemType = (id: number) =>
+  getActiveState().itemTypes.find((itemType) => itemType.id === id) || null;
 
 const getUser = (id: number) =>
   state.users.find((user) => user.id === id) || null;
 
 const getBatch = (id: number) =>
-  state.batches.find((batch) => batch.id === id) || null;
+  getActiveState().batches.find((batch) => batch.id === id) || null;
+
+const getBranch = (id: number) =>
+  state.branches.find((branch) => branch.id === id) || null;
 
 const getBatchAvailableQty = (batch: Batch) =>
   Math.max(batch.qtyReceived - batch.qtyIssued, 0);
 
 const hydrateTransaction = (transaction: Transaction) => {
-  const cardType = getCardType(transaction.cardTypeId);
+  const itemType = getItemType(transaction.itemTypeId);
   const createdBy = getUser(transaction.createdById);
   const batch = transaction.batchId ? getBatch(transaction.batchId) : null;
+  const branch = transaction.issuedToBranchId
+    ? getBranch(transaction.issuedToBranchId)
+    : null;
 
   return {
     ...transaction,
-    cardType: cardType
-      ? { id: cardType.id, name: cardType.name, code: cardType.code, isActive: cardType.isActive }
-      : { id: transaction.cardTypeId, name: "Unknown", code: "UNKNOWN", isActive: false },
+    itemType: itemType
+      ? { id: itemType.id, name: itemType.name, code: itemType.code, isActive: itemType.isActive }
+      : { id: transaction.itemTypeId, name: "Unknown", code: "UNKNOWN", isActive: false },
     createdBy: createdBy
       ? {
           id: createdBy.id,
@@ -278,7 +518,7 @@ const hydrateTransaction = (transaction: Transaction) => {
     batch: batch
       ? {
           id: batch.id,
-          cardTypeId: batch.cardTypeId,
+          itemTypeId: batch.itemTypeId,
           batchCode: batch.batchCode,
           qtyReceived: batch.qtyReceived,
           qtyIssued: batch.qtyIssued,
@@ -286,6 +526,9 @@ const hydrateTransaction = (transaction: Transaction) => {
           receivedAt: batch.receivedAt,
           notes: batch.notes ?? null,
         }
+      : null,
+    issuedToBranch: branch
+      ? { id: branch.id, name: branch.name, code: branch.code, isActive: branch.isActive }
       : null,
   };
 };
@@ -301,16 +544,17 @@ const parseDateParam = (value: string | null) => {
 };
 
 const filterTransactions = (params: URLSearchParams, type?: TransactionType) => {
+  const activeState = getActiveState();
   const typeFilter = params.get("type") || (type ?? "");
-  const cardTypeId = params.get("cardTypeId");
+  const itemTypeId = params.get("itemTypeId");
   const startDateValue = params.get("startDate");
   const endDateValue = params.get("endDate");
   const startDate = startDateValue ? new Date(startDateValue) : null;
   const endDate = parseDateParam(endDateValue);
 
-  return state.transactions.filter((transaction) => {
+  return activeState.transactions.filter((transaction) => {
     if (typeFilter && transaction.type !== typeFilter) return false;
-    if (cardTypeId && transaction.cardTypeId !== Number(cardTypeId)) return false;
+    if (itemTypeId && transaction.itemTypeId !== Number(itemTypeId)) return false;
 
     const createdAt = new Date(transaction.createdAt);
     if (startDate && createdAt < startDate) return false;
@@ -321,17 +565,18 @@ const filterTransactions = (params: URLSearchParams, type?: TransactionType) => 
 };
 
 const computeBalances = () => {
+  const activeState = getActiveState();
   const balances = new Map<number, { balance: number; lastUpdatedAt: string | null }>();
-  state.cardTypes.forEach((cardType) => {
-    balances.set(cardType.id, { balance: 0, lastUpdatedAt: null });
+  activeState.itemTypes.forEach((itemType) => {
+    balances.set(itemType.id, { balance: 0, lastUpdatedAt: null });
   });
 
-  const sorted = [...state.transactions].sort(
+  const sorted = [...activeState.transactions].sort(
     (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
   );
 
   sorted.forEach((transaction) => {
-    const entry = balances.get(transaction.cardTypeId);
+    const entry = balances.get(transaction.itemTypeId);
     if (!entry) return;
     let delta = 0;
     if (transaction.type === "RECEIVE") delta = transaction.qty;
@@ -365,12 +610,20 @@ const parseJsonBody = (options: RequestInit) => {
   }
 };
 
-const requireCardType = (cardTypeId: number) => {
-  const cardType = getCardType(cardTypeId);
-  if (!cardType) {
-    throw new Error("Card type not found");
+const requireItemType = (itemTypeId: number) => {
+  const itemType = getItemType(itemTypeId);
+  if (!itemType) {
+    throw new Error("Item type not found");
   }
-  return cardType;
+  return itemType;
+};
+
+const requireBranch = (branchId: number) => {
+  const branch = getBranch(branchId);
+  if (!branch) {
+    throw new Error("Branch not found");
+  }
+  return branch;
 };
 
 const ensureNumber = (value: FormDataEntryValue | null, field: string) => {
@@ -381,9 +634,9 @@ const ensureNumber = (value: FormDataEntryValue | null, field: string) => {
   return numeric;
 };
 
-const getAvailableBatch = (cardTypeId: number, qty: number) => {
-  const batches = state.batches
-    .filter((batch) => batch.cardTypeId === cardTypeId)
+const getAvailableBatch = (itemTypeId: number, qty: number) => {
+  const batches = getActiveState().batches
+    .filter((batch) => batch.itemTypeId === itemTypeId)
     .sort(
       (a, b) =>
         new Date(a.receivedAt).getTime() - new Date(b.receivedAt).getTime(),
@@ -400,43 +653,52 @@ export async function handleMockApiRequest(
   const [path, queryString] = endpoint.split("?");
   const params = new URLSearchParams(queryString || "");
   const body = parseJsonBody(options) || {};
+  const activeState = getActiveState();
 
   if (path === "/api/health") {
     return { status: "ok", mode: "frontend-only" };
   }
 
-  if (path === "/api/card-types" && method === "GET") {
+  if (path === "/api/item-types" && method === "GET") {
     const includeInactive = params.get("includeInactive") === "true";
-    const cardTypes = includeInactive
-      ? state.cardTypes
-      : state.cardTypes.filter((cardType) => cardType.isActive);
-    return { cardTypes };
+    const itemTypes = includeInactive
+      ? activeState.itemTypes
+      : activeState.itemTypes.filter((itemType) => itemType.isActive);
+    return { itemTypes };
   }
 
-  if (path === "/api/card-types" && method === "POST") {
-    const newCardType: CardType = {
-      id: state.nextIds.cardType++,
-      name: String(body.name || "New Card Type"),
+  if (path === "/api/item-types" && method === "POST") {
+    const newItemType: ItemType = {
+      id: activeState.nextIds.itemType++,
+      name: String(body.name || "New Item Type"),
       code: String(body.code || "NEW"),
       description: body.description ? String(body.description) : null,
       isActive: true,
     };
-    state.cardTypes.push(newCardType);
-    return newCardType;
+    activeState.itemTypes.push(newItemType);
+    return newItemType;
   }
 
-  const cardTypeMatch = path.match(/^\/api\/card-types\/(\d+)$/);
-  if (cardTypeMatch && method === "PATCH") {
-    const id = Number(cardTypeMatch[1]);
-    const cardType = requireCardType(id);
-    cardType.name = body.name ? String(body.name) : cardType.name;
-    cardType.code = body.code ? String(body.code) : cardType.code;
-    cardType.description =
-      body.description !== undefined ? String(body.description || "") : cardType.description;
+  const itemTypeMatch = path.match(/^\/api\/item-types\/(\d+)$/);
+  if (itemTypeMatch && method === "PATCH") {
+    const id = Number(itemTypeMatch[1]);
+    const itemType = requireItemType(id);
+    itemType.name = body.name ? String(body.name) : itemType.name;
+    itemType.code = body.code ? String(body.code) : itemType.code;
+    itemType.description =
+      body.description !== undefined ? String(body.description || "") : itemType.description;
     if (typeof body.isActive === "boolean") {
-      cardType.isActive = body.isActive;
+      itemType.isActive = body.isActive;
     }
-    return cardType;
+    return itemType;
+  }
+
+  if (path === "/api/branches" && method === "GET") {
+    const includeInactive = params.get("includeInactive") === "true";
+    const branches = includeInactive
+      ? state.branches
+      : state.branches.filter((branch) => branch.isActive);
+    return { branches };
   }
 
   if (path === "/api/admin/users" && method === "GET") {
@@ -448,7 +710,7 @@ export async function handleMockApiRequest(
       id: state.nextIds.user++,
       firstName: String(body.firstName || "New"),
       lastName: String(body.lastName || "User"),
-      email: String(body.email || "new.user@omacard.internal"),
+      email: String(body.email || "new.user@omari.internal"),
       username: String(body.username || `user${state.nextIds.user}`),
       role: (body.role as UserRole) || "CLERK",
       isActive: true,
@@ -492,11 +754,11 @@ export async function handleMockApiRequest(
 
   if (path === "/api/reports/stock-balance" && method === "GET") {
     const balances = computeBalances();
-    return state.cardTypes.map((cardType) => {
-      const entry = balances.get(cardType.id);
+    return activeState.itemTypes.map((itemType) => {
+      const entry = balances.get(itemType.id);
       return {
-        id: cardType.id,
-        cardType,
+        id: itemType.id,
+        itemType,
         balance: entry?.balance ?? 0,
         lastUpdatedAt: entry?.lastUpdatedAt ?? new Date().toISOString(),
       };
@@ -528,31 +790,94 @@ export async function handleMockApiRequest(
   const transactionMatch = path.match(/^\/api\/transactions\/(\d+)$/);
   if (transactionMatch && method === "GET") {
     const id = Number(transactionMatch[1]);
-    const transaction = state.transactions.find((candidate) => candidate.id === id);
+    const transaction = activeState.transactions.find((candidate) => candidate.id === id);
     if (!transaction) throw new Error("Transaction not found");
     return hydrateTransaction(transaction);
   }
 
   if (transactionMatch && method === "PATCH") {
     const id = Number(transactionMatch[1]);
-    const transaction = state.transactions.find((candidate) => candidate.id === id);
+    const transaction = activeState.transactions.find((candidate) => candidate.id === id);
     if (!transaction) throw new Error("Transaction not found");
+    if (transaction.status === "REVERSED") {
+      throw new Error("Reversed transactions cannot be edited");
+    }
 
-    if (body.unitCost !== undefined) {
-      transaction.unitCost =
-        body.unitCost === null || body.unitCost === "" ? null : Number(body.unitCost);
+    const roundMoney = (value: number) => Math.round(value * 100) / 100;
+    const normalizeValue = (value: any) =>
+      value === null || value === "" || value === undefined ? null : Number(value);
+
+    if (body.qty !== undefined) {
+      const nextQty = Number(body.qty);
+      if (!Number.isFinite(nextQty) || nextQty <= 0) {
+        throw new Error("Invalid qty");
+      }
+      if (transaction.batchId) {
+        const batch = getBatch(transaction.batchId);
+        if (!batch) throw new Error("Batch not found");
+        if (transaction.type === "RECEIVE") {
+          const nextReceived = batch.qtyReceived - transaction.qty + nextQty;
+          if (nextReceived < batch.qtyIssued) {
+            throw new Error("Quantity lower than issued amount");
+          }
+          batch.qtyReceived = nextReceived;
+        }
+        if (transaction.type === "ISSUE") {
+          const nextIssued = batch.qtyIssued - transaction.qty + nextQty;
+          if (nextIssued > batch.qtyReceived) {
+            throw new Error("Insufficient batch inventory");
+          }
+          batch.qtyIssued = nextIssued;
+        }
+      }
+      transaction.qty = nextQty;
     }
-    if (body.totalCost !== undefined) {
-      transaction.totalCost =
-        body.totalCost === null || body.totalCost === "" ? null : Number(body.totalCost);
+
+    const qty = transaction.qty || 0;
+
+    if (transaction.type === "RECEIVE") {
+      const incomingUnit = body.unitCost !== undefined ? normalizeValue(body.unitCost) : undefined;
+      const incomingTotal =
+        body.totalCost !== undefined ? normalizeValue(body.totalCost) : undefined;
+
+      if (incomingUnit !== undefined) {
+        transaction.unitCost = incomingUnit;
+        transaction.totalCost =
+          incomingUnit != null && qty > 0 ? roundMoney(incomingUnit * qty) : null;
+      } else if (incomingTotal !== undefined) {
+        transaction.totalCost = incomingTotal;
+        transaction.unitCost =
+          incomingTotal != null && qty > 0 ? roundMoney(incomingTotal / qty) : null;
+      } else if (body.qty !== undefined) {
+        if (transaction.unitCost != null) {
+          transaction.totalCost = roundMoney(transaction.unitCost * qty);
+        } else if (transaction.totalCost != null) {
+          transaction.unitCost = roundMoney(transaction.totalCost / qty);
+        }
+      }
     }
-    if (body.unitPrice !== undefined) {
-      transaction.unitPrice =
-        body.unitPrice === null || body.unitPrice === "" ? null : Number(body.unitPrice);
-    }
-    if (body.totalPrice !== undefined) {
-      transaction.totalPrice =
-        body.totalPrice === null || body.totalPrice === "" ? null : Number(body.totalPrice);
+
+    if (transaction.type === "ISSUE") {
+      const incomingUnit =
+        body.unitPrice !== undefined ? normalizeValue(body.unitPrice) : undefined;
+      const incomingTotal =
+        body.totalPrice !== undefined ? normalizeValue(body.totalPrice) : undefined;
+
+      if (incomingUnit !== undefined) {
+        transaction.unitPrice = incomingUnit;
+        transaction.totalPrice =
+          incomingUnit != null && qty > 0 ? roundMoney(incomingUnit * qty) : null;
+      } else if (incomingTotal !== undefined) {
+        transaction.totalPrice = incomingTotal;
+        transaction.unitPrice =
+          incomingTotal != null && qty > 0 ? roundMoney(incomingTotal / qty) : null;
+      } else if (body.qty !== undefined) {
+        if (transaction.unitPrice != null) {
+          transaction.totalPrice = roundMoney(transaction.unitPrice * qty);
+        } else if (transaction.totalPrice != null) {
+          transaction.unitPrice = roundMoney(transaction.totalPrice / qty);
+        }
+      }
     }
 
     return hydrateTransaction(transaction);
@@ -563,20 +888,20 @@ export async function handleMockApiRequest(
     const summary = {
       totalQty: issues.reduce((sum, txn) => sum + txn.qty, 0),
       totalCount: issues.length,
-      byCardType: [] as Array<{ cardType: CardType; totalQty: number; totalCount: number }>,
+      byItemType: [] as Array<{ itemType: ItemType; totalQty: number; totalCount: number }>,
     };
 
-    const byCardType = new Map<number, { totalQty: number; totalCount: number }>();
+    const byItemType = new Map<number, { totalQty: number; totalCount: number }>();
     issues.forEach((txn) => {
-      const current = byCardType.get(txn.cardTypeId) || { totalQty: 0, totalCount: 0 };
+      const current = byItemType.get(txn.itemTypeId) || { totalQty: 0, totalCount: 0 };
       current.totalQty += txn.qty;
       current.totalCount += 1;
-      byCardType.set(txn.cardTypeId, current);
+      byItemType.set(txn.itemTypeId, current);
     });
 
-    summary.byCardType = Array.from(byCardType.entries()).map(([cardTypeId, totals]) => {
+    summary.byItemType = Array.from(byItemType.entries()).map(([itemTypeId, totals]) => {
       return {
-        cardType: requireCardType(cardTypeId),
+        itemType: requireItemType(itemTypeId),
         totalQty: totals.totalQty,
         totalCount: totals.totalCount,
       };
@@ -597,19 +922,19 @@ export async function handleMockApiRequest(
     const summary = {
       totalQty: receipts.reduce((sum, txn) => sum + txn.qty, 0),
       totalCount: receipts.length,
-      byCardType: [] as Array<{ cardType: CardType; totalQty: number; totalCount: number }>,
+      byItemType: [] as Array<{ itemType: ItemType; totalQty: number; totalCount: number }>,
     };
 
-    const byCardType = new Map<number, { totalQty: number; totalCount: number }>();
+    const byItemType = new Map<number, { totalQty: number; totalCount: number }>();
     receipts.forEach((txn) => {
-      const current = byCardType.get(txn.cardTypeId) || { totalQty: 0, totalCount: 0 };
+      const current = byItemType.get(txn.itemTypeId) || { totalQty: 0, totalCount: 0 };
       current.totalQty += txn.qty;
       current.totalCount += 1;
-      byCardType.set(txn.cardTypeId, current);
+      byItemType.set(txn.itemTypeId, current);
     });
 
-    summary.byCardType = Array.from(byCardType.entries()).map(([cardTypeId, totals]) => ({
-      cardType: requireCardType(cardTypeId),
+    summary.byItemType = Array.from(byItemType.entries()).map(([itemTypeId, totals]) => ({
+      itemType: requireItemType(itemTypeId),
       totalQty: totals.totalQty,
       totalCount: totals.totalCount,
     }));
@@ -666,12 +991,12 @@ export async function handleMockApiRequest(
   }
 
   if (path === "/api/inventory/batches" && method === "GET") {
-    const cardTypeId = Number(params.get("cardTypeId"));
-    if (!Number.isFinite(cardTypeId)) {
+    const itemTypeId = Number(params.get("itemTypeId"));
+    if (!Number.isFinite(itemTypeId)) {
       return { batches: [] };
     }
-    const batches = state.batches
-      .filter((batch) => batch.cardTypeId === cardTypeId)
+    const batches = activeState.batches
+      .filter((batch) => batch.itemTypeId === itemTypeId)
       .map((batch) => ({
         ...batch,
         availableQty: getBatchAvailableQty(batch),
@@ -681,22 +1006,22 @@ export async function handleMockApiRequest(
   }
 
   if (path === "/api/reports/finance" && method === "GET") {
-    const cardTypeId = params.get("cardTypeId");
+    const itemTypeId = params.get("itemTypeId");
     const scopeParams = new URLSearchParams(params.toString());
-    if (cardTypeId) {
-      scopeParams.set("cardTypeId", cardTypeId);
+    if (itemTypeId) {
+      scopeParams.set("itemTypeId", itemTypeId);
     }
     const scopedTransactions = filterTransactions(scopeParams);
     const balances = computeBalances();
 
-    const byCardType = state.cardTypes
-      .filter((cardType) => (!cardTypeId ? true : cardType.id === Number(cardTypeId)))
-      .map((cardType) => {
-        const cardTransactions = scopedTransactions.filter(
-          (txn) => txn.cardTypeId === cardType.id,
+    const byItemType = activeState.itemTypes
+      .filter((itemType) => (!itemTypeId ? true : itemType.id === Number(itemTypeId)))
+      .map((itemType) => {
+        const itemTransactions = scopedTransactions.filter(
+          (txn) => txn.itemTypeId === itemType.id,
         );
-        const receives = cardTransactions.filter((txn) => txn.type === "RECEIVE");
-        const issues = cardTransactions.filter((txn) => txn.type === "ISSUE");
+        const receives = itemTransactions.filter((txn) => txn.type === "RECEIVE");
+        const issues = itemTransactions.filter((txn) => txn.type === "ISSUE");
 
         const receivedQty = receives.reduce((sum, txn) => sum + txn.qty, 0);
         const receivedCost = receives.reduce((sum, txn) => {
@@ -713,11 +1038,11 @@ export async function handleMockApiRequest(
 
         const avgUnitCost = receivedQty ? receivedCost / receivedQty : 0;
         const avgUnitPrice = issuedQty ? issuedRevenue / issuedQty : 0;
-        const balance = balances.get(cardType.id)?.balance ?? 0;
+        const balance = balances.get(itemType.id)?.balance ?? 0;
         const inventoryValue = balance * avgUnitCost;
 
         return {
-          cardType: { id: cardType.id, name: cardType.name, code: cardType.code },
+          itemType: { id: itemType.id, name: itemType.name, code: itemType.code },
           receivedQty,
           receivedCost,
           issuedQty,
@@ -730,7 +1055,7 @@ export async function handleMockApiRequest(
         };
       });
 
-    const totals = byCardType.reduce(
+    const totals = byItemType.reduce(
       (acc, item) => {
         acc.totalReceivedQty += item.receivedQty;
         acc.totalReceivedCost += item.receivedCost;
@@ -803,7 +1128,8 @@ export async function handleMockApiRequest(
         return {
           id: hydrated.id,
           type: "RECEIVE" as const,
-          cardType: hydrated.cardType,
+          itemType: hydrated.itemType,
+          status: hydrated.status,
           qty: hydrated.qty,
           unitCost: hydrated.unitCost ?? null,
           totalCost: hydrated.totalCost ?? null,
@@ -825,7 +1151,8 @@ export async function handleMockApiRequest(
         return {
           id: hydrated.id,
           type: "ISSUE" as const,
-          cardType: hydrated.cardType,
+          itemType: hydrated.itemType,
+          status: hydrated.status,
           qty: hydrated.qty,
           unitPrice: hydrated.unitPrice ?? null,
           totalPrice: hydrated.totalPrice ?? null,
@@ -844,7 +1171,7 @@ export async function handleMockApiRequest(
         estimatedProfit,
         profitMargin,
       },
-      byCardType,
+      byItemType,
       chartData,
       recent: {
         receipts,
@@ -859,44 +1186,54 @@ export async function handleMockApiRequest(
 export async function handleMockFormData(endpoint: string, formData: FormData) {
   const [path] = endpoint.split("?");
   const userId = 1;
+  const roundMoney = (value: number) => Math.round(value * 100) / 100;
+  const activeState = getActiveState();
 
   if (path === "/api/inventory/receive") {
-    const cardTypeId = ensureNumber(formData.get("cardTypeId"), "cardTypeId");
+    const itemTypeId = ensureNumber(formData.get("itemTypeId"), "itemTypeId");
     const qtyReceived = ensureNumber(formData.get("qtyReceived"), "qtyReceived");
-    requireCardType(cardTypeId);
-    const batchCode = String(formData.get("batchCode") || `BATCH-${state.nextIds.batch}`);
+    requireItemType(itemTypeId);
+    const batchCode = String(
+      formData.get("batchCode") || `BATCH-${activeState.nextIds.batch}`,
+    );
     const receivedAt = formData.get("receivedAt")
       ? new Date(String(formData.get("receivedAt"))).toISOString()
       : new Date().toISOString();
     const notes = formData.get("notes") ? String(formData.get("notes")) : null;
-    const unitCost =
+    let unitCost =
       formData.get("unitCost") && String(formData.get("unitCost")).length > 0
         ? Number(formData.get("unitCost"))
         : null;
-    const totalCost =
+    let totalCost =
       formData.get("totalCost") && String(formData.get("totalCost")).length > 0
         ? Number(formData.get("totalCost"))
         : null;
+
+    if (unitCost != null && qtyReceived > 0) {
+      totalCost = roundMoney(unitCost * qtyReceived);
+    } else if (totalCost != null && qtyReceived > 0) {
+      unitCost = roundMoney(totalCost / qtyReceived);
+    }
 
     const files = formData
       .getAll("files")
       .filter((entry): entry is File => entry instanceof File);
 
     const batch: Batch = {
-      id: state.nextIds.batch++,
-      cardTypeId,
+      id: activeState.nextIds.batch++,
+      itemTypeId,
       batchCode,
       qtyReceived,
       qtyIssued: 0,
       receivedAt,
       notes,
     };
-    state.batches.push(batch);
+    activeState.batches.push(batch);
 
     const transaction: Transaction = {
-      id: state.nextIds.transaction++,
+      id: activeState.nextIds.transaction++,
       type: "RECEIVE",
-      cardTypeId,
+      itemTypeId,
       qty: qtyReceived,
       createdAt: receivedAt,
       createdById: userId,
@@ -909,40 +1246,54 @@ export async function handleMockFormData(endpoint: string, formData: FormData) {
         ? createAttachmentsFromFormData(files, userId)
         : [],
     };
-    state.transactions.push(transaction);
+    activeState.transactions.push(transaction);
     return hydrateTransaction(transaction);
   }
 
   if (path === "/api/inventory/issue") {
-    const cardTypeId = ensureNumber(formData.get("cardTypeId"), "cardTypeId");
+    const itemTypeId = ensureNumber(formData.get("itemTypeId"), "itemTypeId");
     const qty = ensureNumber(formData.get("qty"), "qty");
-    requireCardType(cardTypeId);
+    requireItemType(itemTypeId);
     const issuedToType = String(formData.get("issuedToType") || "BRANCH") as IssuedToType;
-    const issuedToName = String(formData.get("issuedToName") || "Recipient");
+    const issuedToBranchRaw = formData.get("issuedToBranchId");
+    const issuedToBranchId =
+      issuedToType === "BRANCH" && issuedToBranchRaw != null && String(issuedToBranchRaw).length > 0
+        ? ensureNumber(issuedToBranchRaw, "issuedToBranchId")
+        : null;
+    const issuedToName = String(formData.get("issuedToName") || "");
     const notes = formData.get("notes") ? String(formData.get("notes")) : null;
-    const unitPrice =
+    let unitPrice =
       formData.get("unitPrice") && String(formData.get("unitPrice")).length > 0
         ? Number(formData.get("unitPrice"))
         : null;
-    const totalPrice =
+    let totalPrice =
       formData.get("totalPrice") && String(formData.get("totalPrice")).length > 0
         ? Number(formData.get("totalPrice"))
         : null;
+
+    if (unitPrice != null && qty > 0) {
+      totalPrice = roundMoney(unitPrice * qty);
+    } else if (totalPrice != null && qty > 0) {
+      unitPrice = roundMoney(totalPrice / qty);
+    }
 
     const files = formData
       .getAll("files")
       .filter((entry): entry is File => entry instanceof File);
 
     const batchIdValue = formData.get("batchId");
+    const allowFifo = formData.get("allowFifo") === "true";
     let batch: Batch | null = null;
     if (batchIdValue && String(batchIdValue).length > 0) {
       batch = getBatch(Number(batchIdValue));
+    } else if (allowFifo) {
+      batch = getAvailableBatch(itemTypeId, qty);
     } else {
-      batch = getAvailableBatch(cardTypeId, qty);
+      throw new Error("Batch selection is required for this issue.");
     }
 
     if (!batch) {
-      throw new Error("No available batch for this card type");
+      throw new Error("No available batch for this item type");
     }
 
     if (getBatchAvailableQty(batch) < qty) {
@@ -950,17 +1301,26 @@ export async function handleMockFormData(endpoint: string, formData: FormData) {
     }
 
     batch.qtyIssued += qty;
+    if (issuedToType === "BRANCH" && !issuedToBranchId && !issuedToName.trim()) {
+      throw new Error("Branch name is required.");
+    }
+
+    const branch =
+      issuedToType === "BRANCH" && issuedToBranchId != null
+        ? requireBranch(issuedToBranchId)
+        : null;
 
     const transaction: Transaction = {
-      id: state.nextIds.transaction++,
+      id: activeState.nextIds.transaction++,
       type: "ISSUE",
-      cardTypeId,
+      itemTypeId,
       qty,
       createdAt: new Date().toISOString(),
       createdById: userId,
       status: "COMPLETED",
       issuedToType,
-      issuedToName,
+      issuedToName: issuedToType === "PERSON" ? issuedToName : issuedToName || branch?.name,
+      issuedToBranchId: branch?.id ?? null,
       batchId: batch.id,
       notes,
       unitPrice,
@@ -969,7 +1329,7 @@ export async function handleMockFormData(endpoint: string, formData: FormData) {
         ? createAttachmentsFromFormData(files, userId)
         : [],
     };
-    state.transactions.push(transaction);
+    activeState.transactions.push(transaction);
     return hydrateTransaction(transaction);
   }
 

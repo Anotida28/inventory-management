@@ -58,7 +58,7 @@ export default function LoginPage() {
         <div className="mb-8 text-center flex flex-col items-center">
           <img
             src="/images/20251022_100241_OMARI_LOGO_WITH_AFFILLIATE_STATEMENT_GRADIENT_GREEN_HORIZONTAL_VECTOR_05_page-0001.jpg.png"
-            alt="OmaCard Logo"
+            alt="Omari Logo"
             width={320}
             height={90}
             className="mb-4"

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "components/ui/page-header";
 import TransactionDetailDialog from "modules/transactions/components/transaction-detail-dialog";
@@ -13,7 +13,13 @@ import {
 } from "modules/transactions/lib/filters";
 import { apiRequest } from "services/api";
 import { useToast } from "components/ui/toast-provider";
-import { useSystemCopy } from "lib/system-mode";
+import { useSystemCopy, useSystemMode } from "lib/system-mode";
+
+type ItemType = {
+  id: number;
+  name: string;
+  code: string;
+};
 
 const numberFormatter = new Intl.NumberFormat(undefined, {
   minimumFractionDigits: 2,
@@ -32,10 +38,11 @@ const createEmptyFinancialForm = () => ({
 
 export default function TransactionsPage() {
   const ALL_TYPE_OPTION = "ALL_TYPES";
-  const ALL_CARD_OPTION = "ALL_CARD_TYPES";
+  const ALL_ITEM_OPTION = "ALL_ITEM_TYPES";
   
   const { toast } = useToast();
   const copy = useSystemCopy();
+  const { mode } = useSystemMode();
   const queryClient = useQueryClient();
   const [selectedTransaction, setSelectedTransaction] = useState<any>(null);
   const [valueForm, setValueForm] = useState(createEmptyFinancialForm);
@@ -43,24 +50,34 @@ export default function TransactionsPage() {
     DEFAULT_TRANSACTION_FILTERS,
   );
 
-  const canEditFinancials = true;
+  const canEditFinancials = false;
 
   const toInputValue = (value: number | null | undefined) =>
     value != null ? value.toString() : "";
 
   const { data: transactionsData, isLoading } = useQuery({
-    queryKey: ["transactions", filters],
+    queryKey: ["transactions", filters, mode],
     queryFn: () => {
       const params = buildTransactionQueryParams(filters);
       return apiRequest<any>(`/api/transactions?${params.toString()}`);
     },
   });
 
-  // Hardcoded card types
-  const cardTypes = [
-    { id: 1, name: "Zim-Switch", code: "ZIM-SWITCH" },
-    { id: 2, name: "Visa", code: "VISA" },
-  ];
+  const { data: itemTypes = [] } = useQuery<ItemType[]>({
+    queryKey: ["item-types", mode],
+    queryFn: async () => {
+      const response = await apiRequest<{ itemTypes: ItemType[] }>(
+        "/api/item-types",
+      );
+      return response.itemTypes;
+    },
+  });
+
+  useEffect(() => {
+    setFilters(DEFAULT_TRANSACTION_FILTERS);
+    setSelectedTransaction(null);
+    setValueForm(createEmptyFinancialForm());
+  }, [mode]);
 
   const saveFinancialsMutation = useMutation({
     mutationFn: async ({
@@ -89,6 +106,10 @@ export default function TransactionsPage() {
       });
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
       queryClient.invalidateQueries({ queryKey: ["recent-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["finance-data"] });
+      queryClient.invalidateQueries({ queryKey: ["issues-report"] });
+      queryClient.invalidateQueries({ queryKey: ["receipts-report"] });
+      queryClient.invalidateQueries({ queryKey: ["user-activity-report"] });
     },
     onError: (error: any) => {
       toast({
@@ -104,11 +125,21 @@ export default function TransactionsPage() {
       `/api/transactions/${transactionId}`,
     );
     setSelectedTransaction(transaction);
+    const computedTotalCost =
+      transaction.totalCost ??
+      (transaction.unitCost != null
+        ? transaction.unitCost * transaction.qty
+        : null);
+    const computedTotalPrice =
+      transaction.totalPrice ??
+      (transaction.unitPrice != null
+        ? transaction.unitPrice * transaction.qty
+        : null);
     setValueForm({
       unitCost: toInputValue(transaction.unitCost),
-      totalCost: toInputValue(transaction.totalCost),
+      totalCost: toInputValue(computedTotalCost),
       unitPrice: toInputValue(transaction.unitPrice),
-      totalPrice: toInputValue(transaction.totalPrice),
+      totalPrice: toInputValue(computedTotalPrice),
     });
   };
 
@@ -158,6 +189,14 @@ export default function TransactionsPage() {
     ) {
       return;
     }
+    if (selectedTransaction.status === "REVERSED") {
+      toast({
+        title: "Edit blocked",
+        description: "Reversed transactions cannot be edited.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     const payload: Record<string, string> = {};
 
@@ -205,9 +244,9 @@ export default function TransactionsPage() {
     { value: "REVERSAL", label: "Reversal" },
   ];
 
-  const cardTypeOptions = [
-    { value: ALL_CARD_OPTION, label: copy.itemTypeAllLabel },
-    ...(cardTypes ?? []).map((type) => ({
+  const itemTypeOptions = [
+    { value: ALL_ITEM_OPTION, label: copy.itemTypeAllLabel },
+    ...(itemTypes ?? []).map((type) => ({
       value: type.id.toString(),
       label: type.name,
     })),
@@ -239,9 +278,9 @@ export default function TransactionsPage() {
         onChange={handleFiltersChange}
         defaultFilters={DEFAULT_TRANSACTION_FILTERS}
         typeOptions={typeOptions}
-        cardTypeOptions={cardTypeOptions}
+        itemTypeOptions={itemTypeOptions}
         allTypeValue={ALL_TYPE_OPTION}
-        allCardTypeValue={ALL_CARD_OPTION}
+        allItemTypeValue={ALL_ITEM_OPTION}
       />
 
       <TransactionHistoryTable

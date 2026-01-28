@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 
 export type SystemMode = "CARDS" | "INVENTORY";
 
@@ -35,7 +29,14 @@ type SystemCopy = {
   unitNounPlural: string;
 };
 
-const STORAGE_KEY = "omacard.systemMode";
+const STORAGE_KEY = "omari.systemMode";
+const GLOBAL_MODE_KEY = "__OMARI_SYSTEM_MODE";
+
+const persistMode = (nextMode: SystemMode) => {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(STORAGE_KEY, nextMode);
+  (window as unknown as Record<string, SystemMode>)[GLOBAL_MODE_KEY] = nextMode;
+};
 
 const SystemModeContext = createContext<SystemModeContextValue | undefined>(
   undefined,
@@ -84,6 +85,12 @@ const SYSTEM_MODE_COPY: Record<SystemMode, SystemCopy> = {
 
 const getStoredMode = (): SystemMode => {
   if (typeof window === "undefined") return "CARDS";
+  const globalMode = (window as unknown as Record<string, SystemMode>)[
+    GLOBAL_MODE_KEY
+  ];
+  if (globalMode === "CARDS" || globalMode === "INVENTORY") {
+    return globalMode;
+  }
   const stored = window.localStorage.getItem(STORAGE_KEY);
   return stored === "INVENTORY" ? "INVENTORY" : "CARDS";
 };
@@ -93,15 +100,23 @@ export function SystemModeProvider({
 }: {
   children: React.ReactNode;
 }) {
-  const [mode, setMode] = useState<SystemMode>(getStoredMode);
+  const [mode, setModeState] = useState<SystemMode>(getStoredMode);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    window.localStorage.setItem(STORAGE_KEY, mode);
+    persistMode(mode);
   }, [mode]);
 
+  const setMode = (nextMode: SystemMode) => {
+    persistMode(nextMode);
+    setModeState(nextMode);
+  };
+
   const toggleMode = () => {
-    setMode((prev) => (prev === "CARDS" ? "INVENTORY" : "CARDS"));
+    setModeState((prev) => {
+      const nextMode = prev === "CARDS" ? "INVENTORY" : "CARDS";
+      persistMode(nextMode);
+      return nextMode;
+    });
   };
 
   const value = useMemo(

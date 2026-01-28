@@ -28,7 +28,7 @@ export function Header() {
     <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-border bg-card px-6 shadow-sm dark:shadow-[0_0_0_1px_rgba(255,255,255,0.04)]">
       <div className="flex items-center gap-4">
         <h1 className="text-lg font-semibold text-foreground">
-          OmaCard - {copy.systemName}
+          Omari - {copy.systemName}
         </h1>
       </div>
       <div className="flex items-center gap-4">
