@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -15,6 +16,46 @@ import { IssueInventoryDto } from "./dto/issue-inventory.dto";
 import { buildDiskStorage } from "../uploads/storage/disk.storage";
 import { getModeFromRequest } from "../common/utils/mode";
 import { validationError } from "../common/utils/errors";
+
+const UPLOAD_FIELDS = [{ name: "files", maxCount: 10 }];
+const STORAGE_DIR = process.env.UPLOAD_DIR || "uploads";
+const MAX_UPLOAD_SIZE =
+  Number(process.env.UPLOAD_MAX_FILE_SIZE) || 10 * 1024 * 1024;
+const parseMimeTypes = (value?: string | null) => {
+  if (!value) {
+    return [
+      "application/pdf",
+      "image/jpeg",
+      "image/jpg",
+      "image/png",
+      "image/webp",
+    ];
+  }
+  return value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+};
+const ALLOWED_MIME_TYPES = parseMimeTypes(
+  process.env.UPLOAD_ALLOWED_MIME_TYPES,
+);
+
+const inventoryUploadInterceptor = FileFieldsInterceptor(UPLOAD_FIELDS, {
+  storage: buildDiskStorage(STORAGE_DIR),
+  limits: {
+    fileSize: MAX_UPLOAD_SIZE,
+  },
+  fileFilter: (_req, file, cb) => {
+    if (
+      ALLOWED_MIME_TYPES.length > 0 &&
+      !ALLOWED_MIME_TYPES.includes(file.mimetype)
+    ) {
+      cb(new BadRequestException("Unsupported file type"), false);
+      return;
+    }
+    cb(null, true);
+  },
+});
 
 @Controller("inventory")
 export class InventoryController {
@@ -33,11 +74,7 @@ export class InventoryController {
   }
 
   @Post("receive")
-  @UseInterceptors(
-    FileFieldsInterceptor([{ name: "files", maxCount: 10 }], {
-      storage: buildDiskStorage(process.env.UPLOAD_DIR || "uploads"),
-    }),
-  )
+  @UseInterceptors(inventoryUploadInterceptor)
   async receive(
     @Body() dto: ReceiveInventoryDto,
     @UploadedFiles() files: { files?: Express.Multer.File[] },
@@ -54,11 +91,7 @@ export class InventoryController {
   }
 
   @Post("issue")
-  @UseInterceptors(
-    FileFieldsInterceptor([{ name: "files", maxCount: 10 }], {
-      storage: buildDiskStorage(process.env.UPLOAD_DIR || "uploads"),
-    }),
-  )
+  @UseInterceptors(inventoryUploadInterceptor)
   async issue(
     @Body() dto: IssueInventoryDto,
     @UploadedFiles() files: { files?: Express.Multer.File[] },

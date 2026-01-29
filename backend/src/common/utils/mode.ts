@@ -8,5 +8,6 @@ export const normalizeMode = (value?: string | null): SystemMode => {
 export const getModeFromRequest = (req: any): SystemMode => {
   const header = req?.headers?.["x-system-mode"] as string | undefined;
   const query = req?.query?.mode as string | undefined;
-  return normalizeMode(header || query || null);
+  const fallback = process.env.SYSTEM_MODE || null;
+  return normalizeMode(header || query || fallback);
 };

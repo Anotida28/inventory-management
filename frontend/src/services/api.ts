@@ -3,7 +3,37 @@ import { handleMockApiRequest, handleMockFormData } from "services/mock-api";
 // Defaults to a backend running at http://localhost:5000/api.
 const API_BASE =
   process.env.REACT_APP_API_URL || "http://localhost:5000/api";
+const API_KEY = process.env.REACT_APP_API_KEY || "";
 const USE_MOCK = process.env.REACT_APP_USE_MOCK === "true";
+const MODE_STORAGE_KEY = "omari.systemMode";
+const GLOBAL_MODE_KEY = "__OMARI_SYSTEM_MODE";
+
+const getSystemMode = (): string | undefined => {
+  if (typeof window === "undefined") return undefined;
+  const globalMode = (window as unknown as Record<string, string>)[
+    GLOBAL_MODE_KEY
+  ];
+  if (globalMode === "CARDS" || globalMode === "INVENTORY") {
+    return globalMode;
+  }
+  const stored = window.localStorage.getItem(MODE_STORAGE_KEY);
+  if (stored === "CARDS" || stored === "INVENTORY") {
+    return stored;
+  }
+  return undefined;
+};
+
+const buildAuthHeaders = (): Record<string, string> => {
+  const headers: Record<string, string> = {};
+  if (API_KEY) {
+    headers["x-api-key"] = API_KEY;
+  }
+  const mode = getSystemMode();
+  if (mode) {
+    headers["x-system-mode"] = mode;
+  }
+  return headers;
+};
 
 const normalizeEndpoint = (endpoint: string) => {
   if (endpoint.startsWith("/api/")) {
@@ -20,13 +50,14 @@ export async function apiRequest<T>(
     return handleMockApiRequest(endpoint, options) as Promise<T>;
   }
 
+  const authHeaders = buildAuthHeaders();
   const response = await fetch(`${API_BASE}${normalizeEndpoint(endpoint)}`, {
     ...options,
     headers: {
       "Content-Type": "application/json",
+      ...authHeaders,
       ...options.headers,
     },
-    credentials: "include",
   });
 
   if (!response.ok) {
@@ -47,10 +78,13 @@ export async function apiFormData<T>(
     return handleMockFormData(endpoint, formData) as Promise<T>;
   }
 
+  const authHeaders = buildAuthHeaders();
   const response = await fetch(`${API_BASE}${normalizeEndpoint(endpoint)}`, {
     method: "POST",
     body: formData,
-    credentials: "include",
+    headers: {
+      ...authHeaders,
+    },
   });
 
   if (!response.ok) {
