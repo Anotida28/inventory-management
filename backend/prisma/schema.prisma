@@ -1,0 +1,114 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum TransactionType {
+  RECEIVE
+  ISSUE
+  ADJUSTMENT
+  REVERSAL
+}
+
+enum TransactionStatus {
+  POSTED
+  REVERSED
+}
+
+enum IssuedToType {
+  BRANCH
+  PERSON
+}
+
+model User {
+  id           Int           @id @default(autoincrement())
+  name         String
+  email        String?       @unique
+  role         String
+  isActive     Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  transactions Transaction[]
+  attachments  Attachment[]
+}
+
+model ItemType {
+  id        Int           @id @default(autoincrement())
+  name      String
+  code      String
+  isActive  Boolean       @default(true)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  batches   Batch[]
+  transactions Transaction[]
+}
+
+model Batch {
+  id          Int           @id @default(autoincrement())
+  itemTypeId  Int
+  batchCode   String
+  qtyReceived Int
+  qtyIssued   Int           @default(0)
+  unitCost    Float?
+  totalCost   Float?
+  receivedAt  DateTime
+  notes       String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  itemType    ItemType      @relation(fields: [itemTypeId], references: [id])
+  transactions Transaction[]
+}
+
+model Transaction {
+  id           Int               @id @default(autoincrement())
+  type         TransactionType
+  status       TransactionStatus @default(POSTED)
+  createdAt    DateTime          @default(now())
+
+  itemTypeId   Int
+  batchId      Int?
+  qty          Int
+
+  unitCost     Float?
+  totalCost    Float?
+  unitPrice    Float?
+  totalPrice   Float?
+
+  issuedToType IssuedToType?
+  issuedToName String?
+
+  createdById  Int
+  notes        String?
+
+  itemType     ItemType          @relation(fields: [itemTypeId], references: [id])
+  batch        Batch?            @relation(fields: [batchId], references: [id])
+  createdBy    User              @relation(fields: [createdById], references: [id])
+  attachments  Attachment[]
+
+  @@index([itemTypeId])
+  @@index([batchId])
+  @@index([createdById])
+  @@index([type])
+}
+
+model Attachment {
+  id            Int        @id @default(autoincrement())
+  transactionId Int
+  fileName      String
+  mimeType      String?
+  size          Int?
+  path          String
+  uploadedAt    DateTime   @default(now())
+  uploadedById  Int
+
+  transaction   Transaction @relation(fields: [transactionId], references: [id])
+  uploadedBy    User        @relation(fields: [uploadedById], references: [id])
+
+  @@index([transactionId])
+  @@index([uploadedById])
+}
