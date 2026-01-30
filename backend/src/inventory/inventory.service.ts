@@ -1,3 +1,4 @@
+// src/inventory/inventory.service.ts - FIXED FOR STRING ENUMS
 import { Injectable } from "@nestjs/common";
 import { PrismaService } from "../common/utils/prisma.service";
 import { ReceiveInventoryDto } from "./dto/receive-inventory.dto";
@@ -70,8 +71,8 @@ export class InventoryService {
 
       const transaction = await tx.transaction.create({
         data: {
-          type: "RECEIVE",
-          status: "POSTED",
+          type: "RECEIVE", // Use string directly
+          status: "POSTED", // Use string directly
           itemTypeId: dto.itemTypeId,
           batchId: batch.id,
           qty: dto.qtyReceived,
@@ -143,12 +144,12 @@ export class InventoryService {
 
       const transaction = await tx.transaction.create({
         data: {
-          type: "ISSUE",
-          status: "POSTED",
+          type: "ISSUE", // Use string directly
+          status: "POSTED", // Use string directly
           itemTypeId: dto.itemTypeId,
           batchId: batch.id,
           qty: dto.qty,
-          issuedToType: dto.issuedToType,
+          issuedToType: dto.issuedToType, // Use string directly
           issuedToName: dto.issuedToName.trim(),
           unitPrice: mode === "INVENTORY" ? null : null,
           totalPrice: mode === "INVENTORY" ? null : null,

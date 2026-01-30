@@ -1,6 +1,5 @@
-import { IsDateString, IsEnum, IsInt, IsOptional, Min } from "class-validator";
-import { Type } from "class-transformer";
-import { TransactionType } from "@prisma/client";
+import { IsEnum, IsOptional } from 'class-validator';
+import { TransactionType } from '../../common/enums'; // Changed from @prisma/client
 
 export class TransactionsQueryDto {
   @IsOptional()
@@ -8,26 +7,14 @@ export class TransactionsQueryDto {
   type?: TransactionType;
 
   @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
   itemTypeId?: number;
 
   @IsOptional()
-  @IsDateString()
-  startDate?: string;
+  batchId?: number;
 
   @IsOptional()
-  @IsDateString()
-  endDate?: string;
+  fromDate?: Date;
 
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  page = 1;
-
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  limit = 20;
+  @IsOptional()
+  toDate?: Date;
 }

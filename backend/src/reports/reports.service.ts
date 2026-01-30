@@ -1,17 +1,71 @@
+// src/reports/reports.service.ts - COMPLETE VERSION
 import { Injectable } from "@nestjs/common";
 import { PrismaService } from "../common/utils/prisma.service";
 import { ReportFiltersDto } from "./dto/report-filters.dto";
 import { SystemMode } from "../common/utils/mode";
 import { toTransactionShape } from "../common/utils/transaction-shape";
-import { TransactionType } from "@prisma/client";
 
-const sumCost = (txn: any) => {
+// Add interface for transaction
+interface TransactionWithRelations {
+  id: number;
+  type: string;
+  status: string;
+  itemTypeId: number;
+  qty: number;
+  unitCost: number | null;
+  totalCost: number | null;
+  unitPrice: number | null;
+  totalPrice: number | null;
+  issuedToType: string | null;
+  issuedToName: string | null;
+  createdAt: Date;
+  itemType: {
+    id: number;
+    name: string;
+    code: string;
+    isActive: boolean;
+    createdAt: Date;
+    updatedAt: Date;
+  };
+  batch: {
+    id: number;
+    createdAt: Date;
+    updatedAt: Date;
+    unitCost: number | null;
+    totalCost: number | null;
+    itemTypeId: number;
+    notes: string | null;
+    batchCode: string;
+    qtyReceived: number;
+    qtyIssued: number;
+    receivedAt: Date;
+  } | null;
+  createdBy: {
+    id: number;
+    name: string;
+    email: string | null;
+    role: string;
+    isActive: boolean;
+    createdAt: Date;
+    updatedAt: Date;
+  };
+  attachments: Array<{
+    id: number;
+    fileName: string;
+    mimeType: string | null;
+    size: number | null;
+    path: string;
+    uploadedAt: Date;
+  }>;
+}
+
+const sumCost = (txn: TransactionWithRelations) => {
   if (txn.totalCost != null) return txn.totalCost;
   if (txn.unitCost != null) return txn.unitCost * txn.qty;
   return 0;
 };
 
-const sumRevenue = (txn: any) => {
+const sumRevenue = (txn: TransactionWithRelations) => {
   if (txn.totalPrice != null) return txn.totalPrice;
   if (txn.unitPrice != null) return txn.unitPrice * txn.qty;
   return 0;
@@ -32,7 +86,7 @@ export class ReportsService {
     return where;
   }
 
-  private async fetchTransactions(filters: ReportFiltersDto) {
+  private async fetchTransactions(filters: ReportFiltersDto): Promise<TransactionWithRelations[]> {
     const where = this.buildWhere(filters);
     return this.prisma.transaction.findMany({
       where,
@@ -43,36 +97,34 @@ export class ReportsService {
         attachments: true,
       },
       orderBy: { createdAt: "desc" },
-    });
+    }) as Promise<TransactionWithRelations[]>;
   }
 
   async getDashboard(filters: ReportFiltersDto, mode: SystemMode) {
     const isInventory = mode === "INVENTORY";
-    const [itemTypes, transactions] = await this.prisma.$transaction([
-      this.prisma.itemType.findMany({ orderBy: { name: "asc" } }),
-      this.fetchTransactions(filters),
-    ]);
+    
+    const itemTypes = await this.prisma.itemType.findMany({ orderBy: { name: "asc" } });
+    const transactions = await this.fetchTransactions(filters);
 
     const byItemType = itemTypes
-      .filter((itemType) => !filters.itemTypeId || itemType.id === filters.itemTypeId)
-      .map((itemType) => {
+      .filter((itemType: any) => !filters.itemTypeId || itemType.id === filters.itemTypeId)
+      .map((itemType: any) => {
         const itemTransactions = transactions.filter(
-          (txn) => txn.itemTypeId === itemType.id,
+          (txn: TransactionWithRelations) => txn.itemTypeId === itemType.id,
         );
-        const receives = itemTransactions.filter((txn) => txn.type === "RECEIVE");
-        const issues = itemTransactions.filter((txn) => txn.type === "ISSUE");
+        const receives = itemTransactions.filter((txn: TransactionWithRelations) => txn.type === "RECEIVE");
+        const issues = itemTransactions.filter((txn: TransactionWithRelations) => txn.type === "ISSUE");
 
-        const receivedQty = receives.reduce((sum, txn) => sum + txn.qty, 0);
-        const receivedCost = receives.reduce((sum, txn) => sum + sumCost(txn), 0);
-        const issuedQty = issues.reduce((sum, txn) => sum + txn.qty, 0);
+        const receivedQty = receives.reduce((sum: number, txn: TransactionWithRelations) => sum + txn.qty, 0);
+        const receivedCost = receives.reduce((sum: number, txn: TransactionWithRelations) => sum + sumCost(txn), 0);
+        const issuedQty = issues.reduce((sum: number, txn: TransactionWithRelations) => sum + txn.qty, 0);
         const issuedRevenue = isInventory
           ? 0
-          : issues.reduce((sum, txn) => sum + sumRevenue(txn), 0);
+          : issues.reduce((sum: number, txn: TransactionWithRelations) => sum + sumRevenue(txn), 0);
 
         const balance = receivedQty - issuedQty;
         const avgUnitCost = receivedQty ? receivedCost / receivedQty : 0;
-        const avgUnitPrice =
-          issuedQty && !isInventory ? issuedRevenue / issuedQty : 0;
+        const avgUnitPrice = issuedQty && !isInventory ? issuedRevenue / issuedQty : 0;
         const inventoryValue = balance * avgUnitCost;
         const profit = isInventory ? 0 : issuedRevenue - receivedCost;
 
@@ -95,7 +147,7 @@ export class ReportsService {
       });
 
     const totals = byItemType.reduce(
-      (acc, item) => {
+      (acc: any, item: any) => {
         acc.totalReceivedQty += item.receivedQty;
         acc.totalReceivedCost += item.receivedCost;
         acc.totalIssuedQty += item.issuedQty;
@@ -114,28 +166,19 @@ export class ReportsService {
       },
     );
 
-    const avgReceiveCost = totals.totalReceivedQty
-      ? totals.totalReceivedCost / totals.totalReceivedQty
-      : 0;
-    const avgIssuePrice = totals.totalIssuedQty && !isInventory
-      ? totals.totalIssuedRevenue / totals.totalIssuedQty
-      : 0;
-    const estimatedProfit = isInventory
-      ? 0
-      : totals.totalIssuedRevenue - totals.totalReceivedCost;
-    const profitMargin = totals.totalIssuedRevenue && !isInventory
-      ? (estimatedProfit / totals.totalIssuedRevenue) * 100
-      : 0;
+    const avgReceiveCost = totals.totalReceivedQty ? totals.totalReceivedCost / totals.totalReceivedQty : 0;
+    const avgIssuePrice = totals.totalIssuedQty && !isInventory ? totals.totalIssuedRevenue / totals.totalIssuedQty : 0;
+    const estimatedProfit = isInventory ? 0 : totals.totalIssuedRevenue - totals.totalReceivedCost;
+    const profitMargin = totals.totalIssuedRevenue && !isInventory ? (estimatedProfit / totals.totalIssuedRevenue) * 100 : 0;
 
     const chartBuckets = new Map<string, { cost: number; revenue: number; profit: number }>();
-    transactions.forEach((txn) => {
+    transactions.forEach((txn: TransactionWithRelations) => {
       const date = new Date(txn.createdAt);
       const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
       if (!chartBuckets.has(key)) {
         chartBuckets.set(key, { cost: 0, revenue: 0, profit: 0 });
       }
-      const bucket = chartBuckets.get(key);
-      if (!bucket) return;
+      const bucket = chartBuckets.get(key)!;
       if (txn.type === "RECEIVE") {
         const cost = sumCost(txn);
         bucket.cost += cost;
@@ -159,9 +202,9 @@ export class ReportsService {
       .slice(-6);
 
     const receipts = transactions
-      .filter((txn) => txn.type === "RECEIVE")
+      .filter((txn: TransactionWithRelations) => txn.type === "RECEIVE")
       .slice(0, 5)
-      .map((txn) => ({
+      .map((txn: TransactionWithRelations) => ({
         id: txn.id,
         type: "RECEIVE" as const,
         itemType: {
@@ -178,9 +221,9 @@ export class ReportsService {
       }));
 
     const issues = transactions
-      .filter((txn) => txn.type === "ISSUE")
+      .filter((txn: TransactionWithRelations) => txn.type === "ISSUE")
       .slice(0, 5)
-      .map((txn) => ({
+      .map((txn: TransactionWithRelations) => ({
         id: txn.id,
         type: "ISSUE" as const,
         itemType: {
@@ -212,24 +255,21 @@ export class ReportsService {
   }
 
   async getStockBalance(filters: ReportFiltersDto) {
-    const [itemTypes, transactions] = await this.prisma.$transaction([
+    const [itemTypes, transactions] = await Promise.all([
       this.prisma.itemType.findMany({ orderBy: { name: "asc" } }),
       this.fetchTransactions(filters),
     ]);
 
-    const byItemType = itemTypes.map((itemType) => {
+    const byItemType = itemTypes.map((itemType: any) => {
       const itemTransactions = transactions.filter(
-        (txn) => txn.itemTypeId === itemType.id,
+        (txn: TransactionWithRelations) => txn.itemTypeId === itemType.id,
       );
-      const balance = itemTransactions.reduce((sum, txn) => {
+      const balance = itemTransactions.reduce((sum: number, txn: TransactionWithRelations) => {
         if (txn.type === "RECEIVE") return sum + txn.qty;
         if (txn.type === "ISSUE") return sum - txn.qty;
         return sum;
       }, 0);
-      const lastUpdatedAt =
-        itemTransactions.length > 0
-          ? itemTransactions[0].createdAt
-          : new Date().toISOString();
+      const lastUpdatedAt = itemTransactions.length > 0 ? itemTransactions[0].createdAt : new Date();
 
       return {
         itemType: {
@@ -245,7 +285,7 @@ export class ReportsService {
     return {
       summary: {
         totalCount: byItemType.length,
-        totalQty: byItemType.reduce((sum, item) => sum + item.balance, 0),
+        totalQty: byItemType.reduce((sum: number, item: any) => sum + item.balance, 0),
       },
       byItemType,
     };
@@ -253,10 +293,10 @@ export class ReportsService {
 
   async getIssues(filters: ReportFiltersDto) {
     const transactions = await this.fetchTransactions(filters);
-    const issues = transactions.filter((txn) => txn.type === "ISSUE");
+    const issues = transactions.filter((txn: TransactionWithRelations) => txn.type === "ISSUE");
 
     const byItemType = new Map<number, { itemType: any; totalQty: number; totalCount: number }>();
-    issues.forEach((txn) => {
+    issues.forEach((txn: TransactionWithRelations) => {
       const current = byItemType.get(txn.itemTypeId) || {
         itemType: txn.itemType,
         totalQty: 0,
@@ -280,20 +320,20 @@ export class ReportsService {
     return {
       summary: {
         totalCount: issues.length,
-        totalQty: issues.reduce((sum, txn) => sum + txn.qty, 0),
+        totalQty: issues.reduce((sum: number, txn: TransactionWithRelations) => sum + txn.qty, 0),
         byItemType: byItemTypeList,
       },
       byItemType: byItemTypeList,
-      issues: issues.map((txn) => toTransactionShape(txn)),
+      issues: issues.map((txn: TransactionWithRelations) => toTransactionShape(txn)),
     };
   }
 
   async getReceipts(filters: ReportFiltersDto) {
     const transactions = await this.fetchTransactions(filters);
-    const receipts = transactions.filter((txn) => txn.type === "RECEIVE");
+    const receipts = transactions.filter((txn: TransactionWithRelations) => txn.type === "RECEIVE");
 
     const byItemType = new Map<number, { itemType: any; totalQty: number; totalCount: number; totalReceivedCost: number }>();
-    receipts.forEach((txn) => {
+    receipts.forEach((txn: TransactionWithRelations) => {
       const current = byItemType.get(txn.itemTypeId) || {
         itemType: txn.itemType,
         totalQty: 0,
@@ -320,12 +360,12 @@ export class ReportsService {
     return {
       summary: {
         totalCount: receipts.length,
-        totalQty: receipts.reduce((sum, txn) => sum + txn.qty, 0),
-        totalReceivedCost: receipts.reduce((sum, txn) => sum + sumCost(txn), 0),
+        totalQty: receipts.reduce((sum: number, txn: TransactionWithRelations) => sum + txn.qty, 0),
+        totalReceivedCost: receipts.reduce((sum: number, txn: TransactionWithRelations) => sum + sumCost(txn), 0),
         byItemType: byItemTypeList,
       },
       byItemType: byItemTypeList,
-      receipts: receipts.map((txn) => toTransactionShape(txn)),
+      receipts: receipts.map((txn: TransactionWithRelations) => toTransactionShape(txn)),
     };
   }
 
@@ -334,7 +374,7 @@ export class ReportsService {
 
     const byUser = new Map<number, any>();
 
-    transactions.forEach((txn) => {
+    transactions.forEach((txn: TransactionWithRelations) => {
       const user = txn.createdBy;
       if (!user) return;
       if (!byUser.has(user.id)) {
@@ -373,7 +413,7 @@ export class ReportsService {
         totalTransactions: transactions.length,
       },
       byUser: byUserList,
-      transactions: transactions.map((txn) => toTransactionShape(txn)),
+      transactions: transactions.map((txn: TransactionWithRelations) => toTransactionShape(txn)),
     };
   }
 }

@@ -1,9 +1,11 @@
+// transactions.service.ts - FIXED
 import { Injectable } from "@nestjs/common";
 import { PrismaService } from "../common/utils/prisma.service";
 import { normalizePagination, buildPagination } from "../common/utils/pagination";
 import { syncUnitTotal } from "../common/utils/money-sync";
 import { notFoundError, validationError, forbiddenError } from "../common/utils/errors";
-import { TransactionType } from "@prisma/client";
+// Remove: import { TransactionType } from "@prisma/client";
+import { TransactionType } from "../common/enums"; // Add custom enum
 import { UpdateTransactionDto } from "./dto/update-transaction.dto";
 import { SystemMode } from "../common/utils/mode";
 import { toTransactionShape } from "../common/utils/transaction-shape";
