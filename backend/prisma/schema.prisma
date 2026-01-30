@@ -26,6 +26,7 @@ model ItemType {
   isActive  Boolean       @default(true)
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
+  itemtype   String?
   batches   Batch[]
   transactions Transaction[]
 }
@@ -42,7 +43,6 @@ model Batch {
   notes       String?
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
-
   itemType    ItemType      @relation(fields: [itemTypeId], references: [id])
   transactions Transaction[]
 }

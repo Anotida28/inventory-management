@@ -27,4 +27,9 @@ export class IssueInventoryDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @IsString()
+  @IsOptional()
+  itemtype?: string; // Add this
 }
+

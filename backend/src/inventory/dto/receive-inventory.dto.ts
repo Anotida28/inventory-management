@@ -25,6 +25,10 @@ export class ReceiveInventoryDto {
   notes?: string;
 
   @IsOptional()
+  @IsString()
+  itemtype?: string;
+
+  @IsOptional()
   @Type(() => Number)
   @Min(0)
   unitCost?: number | null;

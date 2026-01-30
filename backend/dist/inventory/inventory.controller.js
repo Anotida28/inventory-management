@@ -58,24 +58,29 @@ let InventoryController = class InventoryController {
     constructor(inventoryService) {
         this.inventoryService = inventoryService;
     }
-    async getBatches(itemTypeId) {
+    async getBatches(itemTypeId, itemtype) {
         const id = Number(itemTypeId);
         if (!Number.isFinite(id)) {
             return { batches: [] };
         }
-        const batches = await this.inventoryService.getBatches(id);
+        const batches = await this.inventoryService.getBatches(id, itemtype);
         return { batches };
     }
-    async receive(dto, files) {
+    async receive(dto, files, req) {
         if (!dto.itemTypeId) {
             throw (0, errors_1.validationError)("itemTypeId is required", { itemTypeId: "Required" });
         }
-        const result = await this.inventoryService.receive(dto, files?.files || [], 1);
+        // Get itemtype from request body or default to INVENTORY
+        const itemtype = dto.itemtype || (0, mode_1.getModeFromRequest)(req) || "INVENTORY";
+        const result = await this.inventoryService.receive(dto, files?.files || [], 1, // userId - you should get this from auth
+        itemtype);
         return result;
     }
     async issue(dto, files, req) {
-        const mode = (0, mode_1.getModeFromRequest)(req);
-        const result = await this.inventoryService.issue(dto, files?.files || [], 1, mode);
+        // Get itemtype from request body or default to INVENTORY
+        const itemtype = dto.itemtype || (0, mode_1.getModeFromRequest)(req) || "INVENTORY";
+        const result = await this.inventoryService.issue(dto, files?.files || [], 1, // userId - you should get this from auth
+        itemtype);
         return result;
     }
 };
@@ -83,8 +88,9 @@ exports.InventoryController = InventoryController;
 __decorate([
     (0, common_1.Get)("batches"),
     __param(0, (0, common_1.Query)("itemTypeId")),
+    __param(1, (0, common_1.Query)("itemtype")),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
+    __metadata("design:paramtypes", [String, String]),
     __metadata("design:returntype", Promise)
 ], InventoryController.prototype, "getBatches", null);
 __decorate([
@@ -92,8 +98,9 @@ __decorate([
     (0, common_1.UseInterceptors)(inventoryUploadInterceptor),
     __param(0, (0, common_1.Body)()),
     __param(1, (0, common_1.UploadedFiles)()),
+    __param(2, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [receive_inventory_dto_1.ReceiveInventoryDto, Object]),
+    __metadata("design:paramtypes", [receive_inventory_dto_1.ReceiveInventoryDto, Object, Object]),
     __metadata("design:returntype", Promise)
 ], InventoryController.prototype, "receive", null);
 __decorate([

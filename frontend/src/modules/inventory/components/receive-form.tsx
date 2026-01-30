@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { PageHeader } from "components/ui/page-header";
@@ -26,6 +26,7 @@ import { useSystemCopy, useSystemMode } from "lib/system-mode";
 import { qk } from "lib/query-keys";
 import { syncUnitTotal } from "lib/money-sync";
 
+
 type ItemType = {
   id: number;
   name: string;
@@ -49,6 +50,10 @@ export default function ReceiveForm() {
     unitCost: "",
     totalCost: "",
   });
+
+    useEffect(() => {
+    console.log(`ReceiveForm - Current mode: ${mode}`);
+  }, [mode]);
 
   const { data: itemTypes = [], isLoading: isLoadingItemTypes } = useQuery<ItemType[]>({
     queryKey: qk.itemTypes(mode),
@@ -197,6 +202,8 @@ export default function ReceiveForm() {
     files.forEach((fileWithMeta) => {
       submitFormData.append("files", fileWithMeta.file);
     });
+
+      submitFormData.append("itemtype", mode);
 
     receiveMutation.mutate({
       formData: submitFormData,

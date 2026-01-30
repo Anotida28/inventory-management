@@ -64,12 +64,15 @@ export class InventoryController {
   ) {}
 
   @Get("batches")
-  async getBatches(@Query("itemTypeId") itemTypeId?: string) {
+  async getBatches(
+    @Query("itemTypeId") itemTypeId?: string,
+    @Query("itemtype") itemtype?: string, // Add itemtype filter
+  ) {
     const id = Number(itemTypeId);
     if (!Number.isFinite(id)) {
       return { batches: [] };
     }
-    const batches = await this.inventoryService.getBatches(id);
+    const batches = await this.inventoryService.getBatches(id, itemtype);
     return { batches };
   }
 
@@ -78,14 +81,20 @@ export class InventoryController {
   async receive(
     @Body() dto: ReceiveInventoryDto,
     @UploadedFiles() files: { files?: Express.Multer.File[] },
+    @Req() req: any,
   ) {
     if (!dto.itemTypeId) {
       throw validationError("itemTypeId is required", { itemTypeId: "Required" });
     }
+    
+    // Get itemtype from request body or default to INVENTORY
+    const itemtype = dto.itemtype || getModeFromRequest(req) || "INVENTORY";
+    
     const result = await this.inventoryService.receive(
       dto,
       files?.files || [],
-      1,
+      1, // userId - you should get this from auth
+      itemtype, // Pass itemtype parameter
     );
     return result;
   }
@@ -97,12 +106,14 @@ export class InventoryController {
     @UploadedFiles() files: { files?: Express.Multer.File[] },
     @Req() req: any,
   ) {
-    const mode = getModeFromRequest(req);
+    // Get itemtype from request body or default to INVENTORY
+    const itemtype = dto.itemtype || getModeFromRequest(req) || "INVENTORY";
+    
     const result = await this.inventoryService.issue(
       dto,
       files?.files || [],
-      1,
-      mode,
+      1, // userId - you should get this from auth
+      itemtype, // Changed from mode to itemtype
     );
     return result;
   }
