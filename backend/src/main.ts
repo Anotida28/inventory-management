@@ -30,7 +30,7 @@ async function bootstrap() {
   );
   app.useGlobalFilters(new AllExceptionsFilter());
 
-  const port = process.env.PORT ? Number(process.env.PORT) : 5000;
+  const port = process.env.PORT ? Number(process.env.PORT) : 3400;
   await app.listen(port);
 }
 

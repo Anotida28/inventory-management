@@ -1,8 +1,8 @@
 import { handleMockApiRequest, handleMockFormData } from "services/mock-api";
 
-// Defaults to a backend running at http://localhost:5000/api.
+// Defaults to a backend running at http://localhost:3400/api.
 const API_BASE =
-  process.env.REACT_APP_API_URL || "http://localhost:5000/api";
+  process.env.REACT_APP_API_URL || "http://172.16.3.21:3400/api";
 const API_KEY = process.env.REACT_APP_API_KEY || "";
 const USE_MOCK = process.env.REACT_APP_USE_MOCK === "true";
 const MODE_STORAGE_KEY = "omari.systemMode";

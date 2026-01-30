@@ -27,7 +27,7 @@ const parseUploadMaxSize = (value) => {
 exports.default = () => {
     const systemMode = (0, mode_1.normalizeMode)(process.env.SYSTEM_MODE);
     return {
-        port: process.env.PORT ? Number(process.env.PORT) : 5000,
+        port: process.env.PORT ? Number(process.env.PORT) : 3400,
         uploadDir: process.env.UPLOAD_DIR || "uploads",
         systemMode,
         apiKey: process.env.API_KEY ?? null,

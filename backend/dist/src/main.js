@@ -29,7 +29,7 @@ async function bootstrap() {
         },
     }));
     app.useGlobalFilters(new all_exceptions_filter_1.AllExceptionsFilter());
-    const port = process.env.PORT ? Number(process.env.PORT) : 5000;
+    const port = process.env.PORT ? Number(process.env.PORT) : 3400;
     await app.listen(port);
 }
 bootstrap();
