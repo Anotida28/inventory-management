@@ -1,6 +1,6 @@
 import { Type } from "class-transformer";
 import { IsEnum, IsInt, IsOptional, IsString, Min } from "class-validator";
-import { IssuedToType } from "@prisma/client";
+import { IssuedToType } from "../../common/enums"; // Changed from @prisma/client
 
 export class IssueInventoryDto {
   @Type(() => Number)

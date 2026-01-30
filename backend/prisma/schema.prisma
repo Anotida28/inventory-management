@@ -3,25 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider = "mysql"
+  provider = "sqlserver"
   url      = env("DATABASE_URL")
-}
-
-enum TransactionType {
-  RECEIVE
-  ISSUE
-  ADJUSTMENT
-  REVERSAL
-}
-
-enum TransactionStatus {
-  POSTED
-  REVERSED
-}
-
-enum IssuedToType {
-  BRANCH
-  PERSON
 }
 
 model User {
@@ -32,8 +15,8 @@ model User {
   isActive     Boolean       @default(true)
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
-  transactions Transaction[]
-  attachments  Attachment[]
+  transactions Transaction[] @relation("UserTransactions")
+  attachments  Attachment[]  @relation("UserAttachments")
 }
 
 model ItemType {
@@ -66,34 +49,32 @@ model Batch {
 
 model Transaction {
   id           Int               @id @default(autoincrement())
-  type         TransactionType
-  status       TransactionStatus @default(POSTED)
+  type         String
+  status       String            @default("POSTED")
   createdAt    DateTime          @default(now())
-
   itemTypeId   Int
   batchId      Int?
   qty          Int
-
   unitCost     Float?
   totalCost    Float?
   unitPrice    Float?
   totalPrice   Float?
-
-  issuedToType IssuedToType?
+  issuedToType String?
   issuedToName String?
-
   createdById  Int
   notes        String?
-
+  
   itemType     ItemType          @relation(fields: [itemTypeId], references: [id])
-  batch        Batch?            @relation(fields: [batchId], references: [id])
-  createdBy    User              @relation(fields: [createdById], references: [id])
+  batch        Batch?            @relation(fields: [batchId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  createdBy    User              @relation("UserTransactions", fields: [createdById], references: [id])
   attachments  Attachment[]
 
   @@index([itemTypeId])
   @@index([batchId])
   @@index([createdById])
   @@index([type])
+  @@index([status])
+  @@index([issuedToType])
 }
 
 model Attachment {
@@ -106,8 +87,8 @@ model Attachment {
   uploadedAt    DateTime   @default(now())
   uploadedById  Int
 
-  transaction   Transaction @relation(fields: [transactionId], references: [id])
-  uploadedBy    User        @relation(fields: [uploadedById], references: [id])
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  uploadedBy    User        @relation("UserAttachments", fields: [uploadedById], references: [id])
 
   @@index([transactionId])
   @@index([uploadedById])
