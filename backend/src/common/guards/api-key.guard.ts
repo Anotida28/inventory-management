@@ -10,7 +10,7 @@ export class ApiKeyGuard implements CanActivate {
     if (!requiredKey) {
       throw new UnauthorizedException("API key is not configured");
     }
-
+////asasas
     const request = context.switchToHttp().getRequest();
     const headerValue =
       request.headers?.["x-api-key"] ||
