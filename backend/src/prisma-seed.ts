@@ -33,8 +33,8 @@ async function main() {
 
   // Create item types
   const itemTypes = [
-    { name: "OMARI-VISA", code: "OMARI-VISA", isActive: true },
-    { name: "OMARI-ZIMSWITCH", code: "OMARI-ZIMSWITCH", isActive: true },
+    { name: "OMARI-VISA", code: "OMARI-VISA", isActive: true, itemtype: "CARDS" },
+    { name: "OMARI-ZIMSWITCH", code: "OMARI-ZIMSWITCH", isActive: true, itemtype: "CARDS" },
   ];
 
   for (const item of itemTypes) {
