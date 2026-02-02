@@ -9,11 +9,11 @@ async function main() {
   const seededUsers = [
     {
       username: "finance",
-      password: "finance",
+      password: "finance@123",
     },
     {
       username: "sales",
-      password: "sales",
+      password: "sales@123",
     },
   ];
 
