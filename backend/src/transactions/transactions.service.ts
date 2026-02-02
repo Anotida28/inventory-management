@@ -21,12 +21,15 @@ export class TransactionsService {
     endDate?: string;
     page?: number;
     limit?: number;
-  }) {
+  }, mode?: SystemMode) {
     const { page, limit, skip } = normalizePagination(params.page, params.limit);
     const where: any = {};
 
     if (params.type) where.type = params.type;
     if (params.itemTypeId) where.itemTypeId = params.itemTypeId;
+    if (mode) {
+      where.itemType = { itemtype: mode };
+    }
     if (params.startDate || params.endDate) {
       where.createdAt = {};
       if (params.startDate) where.createdAt.gte = new Date(params.startDate);
@@ -55,9 +58,13 @@ export class TransactionsService {
     };
   }
 
-  async findOne(id: number) {
-    const transaction = await this.prisma.transaction.findUnique({
-      where: { id },
+  async findOne(id: number, mode?: SystemMode) {
+    const where: any = { id };
+    if (mode) {
+      where.itemType = { itemtype: mode };
+    }
+    const transaction = await this.prisma.transaction.findFirst({
+      where,
       include: {
         itemType: true,
         batch: true,
@@ -73,9 +80,12 @@ export class TransactionsService {
     return this.prisma.$transaction(async (tx) => {
       const transaction = await tx.transaction.findUnique({
         where: { id },
-        include: { batch: true },
+        include: { batch: true, itemType: true },
       });
       if (!transaction) throw notFoundError("Transaction not found");
+      if (mode && transaction.itemType?.itemtype && transaction.itemType.itemtype !== mode) {
+        throw forbiddenError("Transaction belongs to another mode");
+      }
       if (transaction.status !== "POSTED") {
         throw forbiddenError("Only posted transactions can be edited");
       }

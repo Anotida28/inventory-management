@@ -32,7 +32,6 @@ export default () => {
     port: process.env.PORT ? Number(process.env.PORT) : 3400,
     uploadDir: process.env.UPLOAD_DIR || "uploads",
     systemMode,
-    apiKey: process.env.API_KEY ?? null,
     uploadMaxFileSize: parseUploadMaxSize(process.env.UPLOAD_MAX_FILE_SIZE),
     uploadAllowedMimeTypes: parseAllowedMimeTypes(
       process.env.UPLOAD_ALLOWED_MIME_TYPES,

@@ -10,12 +10,13 @@ exports.InventoryModule = void 0;
 const common_1 = require("@nestjs/common");
 const inventory_controller_1 = require("./inventory.controller");
 const inventory_service_1 = require("./inventory.service");
+const username_guard_1 = require("../common/guards/username.guard");
 let InventoryModule = class InventoryModule {
 };
 exports.InventoryModule = InventoryModule;
 exports.InventoryModule = InventoryModule = __decorate([
     (0, common_1.Module)({
         controllers: [inventory_controller_1.InventoryController],
-        providers: [inventory_service_1.InventoryService],
+        providers: [inventory_service_1.InventoryService, username_guard_1.UsernameGuard],
     })
 ], InventoryModule);

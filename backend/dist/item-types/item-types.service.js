@@ -22,19 +22,24 @@ let ItemTypesService = class ItemTypesService {
     constructor(prisma) {
         this.prisma = prisma;
     }
-    async findAll(includeInactive = false) {
+    async findAll(includeInactive = false, mode) {
+        const where = includeInactive ? {} : { isActive: true };
+        if (mode) {
+            where.itemtype = mode;
+        }
         return this.prisma.itemType.findMany({
-            where: includeInactive ? undefined : { isActive: true },
+            where,
             orderBy: { name: "asc" },
         });
     }
-    async create(dto) {
+    async create(dto, mode) {
         const code = dto.code?.trim() || toItemTypeCode(dto.name);
         return this.prisma.itemType.create({
             data: {
                 name: dto.name.trim(),
                 code,
                 isActive: true,
+                itemtype: mode ?? null,
             },
         });
     }

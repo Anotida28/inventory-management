@@ -6,18 +6,34 @@ const prisma = new PrismaClient();
 async function main() {
   console.log("Seeding database...");
 
-  // Create admin user
-  const admin = await prisma.user.upsert({
-    where: { email: "admin@omari.internal" },
+
+  // Create Finance user
+  const finance = await prisma.user.upsert({
+    where: { username: "finance" },
     update: {},
     create: {
-      name: "System Administrator",
-      email: "admin@omari.internal",
-      role: "ADMIN",
+      name: "Finance User",
+      username: "finance",
+      password: "finance123",
+      role: "FINANCE",
       isActive: true,
     },
   });
-  console.log(`Admin user created with id: ${admin.id}`);
+  console.log(`Finance user created with id: ${finance.id}`);
+
+  // Create Sales user
+  const sales = await prisma.user.upsert({
+    where: { username: "sales" },
+    update: {},
+    create: {
+      name: "Sales User",
+      username: "sales",
+      password: "sales123",
+      role: "SALES",
+      isActive: true,
+    },
+  });
+  console.log(`Sales user created with id: ${sales.id}`);
 
   // Create item types
   const itemTypes = [

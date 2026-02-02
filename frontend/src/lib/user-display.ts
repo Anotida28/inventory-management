@@ -1,8 +1,8 @@
+
+// Use the backend user object structure
 export type DisplayUser = {
-  name?: string | null;
-  firstName?: string | null;
-  lastName?: string | null;
-  email?: string | null;
+  id?: string | number;
+  username?: string;
 };
 
 export const getUserDisplayName = (
@@ -10,10 +10,6 @@ export const getUserDisplayName = (
   fallback = "System",
 ) => {
   if (!user) return fallback;
-  const name = user.name?.trim();
-  if (name) return name;
-  const composed = [user.firstName, user.lastName].filter(Boolean).join(" ").trim();
-  if (composed) return composed;
-  if (user.email) return user.email;
+  if (user.username) return user.username;
   return fallback;
 };

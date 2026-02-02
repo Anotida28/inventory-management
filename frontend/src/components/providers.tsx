@@ -3,7 +3,9 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
 import { ToastProvider } from "components/ui/toast-provider";
+
 import { SystemModeProvider } from "lib/system-mode";
+import { UserProvider } from "lib/user-context";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -20,9 +22,11 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <SystemModeProvider>
-        <ToastProvider>{children}</ToastProvider>
-      </SystemModeProvider>
+      <UserProvider>
+        <SystemModeProvider>
+          <ToastProvider>{children}</ToastProvider>
+        </SystemModeProvider>
+      </UserProvider>
     </QueryClientProvider>
   );
 }

@@ -18,15 +18,18 @@ const transactions_service_1 = require("./transactions.service");
 const transactions_query_dto_1 = require("./dto/transactions-query.dto");
 const update_transaction_dto_1 = require("./dto/update-transaction.dto");
 const mode_1 = require("../common/utils/mode");
+const username_guard_1 = require("../common/guards/username.guard");
 let TransactionsController = class TransactionsController {
     constructor(transactionsService) {
         this.transactionsService = transactionsService;
     }
-    async getTransactions(query) {
-        return this.transactionsService.findMany(query);
+    async getTransactions(query, req) {
+        const mode = (0, mode_1.getModeFromRequest)(req);
+        return this.transactionsService.findMany(query, mode);
     }
-    async getTransaction(id) {
-        return this.transactionsService.findOne(id);
+    async getTransaction(id, req) {
+        const mode = (0, mode_1.getModeFromRequest)(req);
+        return this.transactionsService.findOne(id, mode);
     }
     async updateTransaction(id, dto, req) {
         const mode = (0, mode_1.getModeFromRequest)(req);
@@ -37,15 +40,17 @@ exports.TransactionsController = TransactionsController;
 __decorate([
     (0, common_1.Get)(),
     __param(0, (0, common_1.Query)()),
+    __param(1, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [transactions_query_dto_1.TransactionsQueryDto]),
+    __metadata("design:paramtypes", [transactions_query_dto_1.TransactionsQueryDto, Object]),
     __metadata("design:returntype", Promise)
 ], TransactionsController.prototype, "getTransactions", null);
 __decorate([
     (0, common_1.Get)(":id"),
     __param(0, (0, common_1.Param)("id", common_1.ParseIntPipe)),
+    __param(1, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Number]),
+    __metadata("design:paramtypes", [Number, Object]),
     __metadata("design:returntype", Promise)
 ], TransactionsController.prototype, "getTransaction", null);
 __decorate([
@@ -59,5 +64,6 @@ __decorate([
 ], TransactionsController.prototype, "updateTransaction", null);
 exports.TransactionsController = TransactionsController = __decorate([
     (0, common_1.Controller)("transactions"),
+    (0, common_1.UseGuards)(username_guard_1.UsernameGuard),
     __metadata("design:paramtypes", [transactions_service_1.TransactionsService])
 ], TransactionsController);

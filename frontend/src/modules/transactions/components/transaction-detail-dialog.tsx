@@ -15,6 +15,7 @@ import { format } from "date-fns";
 import { Download, FileText } from "lucide-react";
 import type { Dispatch, SetStateAction } from "react";
 import { useSystemCopy, useSystemMode } from "lib/system-mode";
+import { buildApiUrl } from "services/api";
 import { syncUnitTotal } from "lib/money-sync";
 import { getUserDisplayName } from "lib/user-display";
 
@@ -388,7 +389,12 @@ export default function TransactionDetailDialog({
                             <span className="text-sm">{file.fileName}</span>
                           </div>
                           <a
-                            href={file.fileUrl}
+                            href={
+                              typeof file.fileUrl === "string" &&
+                              file.fileUrl.startsWith("http")
+                                ? file.fileUrl
+                                : buildApiUrl(file.fileUrl || "")
+                            }
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-blue-600 hover:underline dark:text-blue-400"

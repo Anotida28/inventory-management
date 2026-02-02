@@ -11,6 +11,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.TransactionsQueryDto = void 0;
 const class_validator_1 = require("class-validator");
+const class_transformer_1 = require("class-transformer");
 const enums_1 = require("../../common/enums"); // Changed from @prisma/client
 class TransactionsQueryDto {
 }
@@ -22,17 +23,39 @@ __decorate([
 ], TransactionsQueryDto.prototype, "type", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Type)(() => Number),
+    (0, class_validator_1.IsInt)(),
+    (0, class_validator_1.Min)(1),
     __metadata("design:type", Number)
 ], TransactionsQueryDto.prototype, "itemTypeId", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Type)(() => Number),
+    (0, class_validator_1.IsInt)(),
+    (0, class_validator_1.Min)(1),
     __metadata("design:type", Number)
 ], TransactionsQueryDto.prototype, "batchId", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
-    __metadata("design:type", Date)
-], TransactionsQueryDto.prototype, "fromDate", void 0);
+    (0, class_validator_1.IsDateString)(),
+    __metadata("design:type", String)
+], TransactionsQueryDto.prototype, "startDate", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
-    __metadata("design:type", Date)
-], TransactionsQueryDto.prototype, "toDate", void 0);
+    (0, class_validator_1.IsDateString)(),
+    __metadata("design:type", String)
+], TransactionsQueryDto.prototype, "endDate", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Type)(() => Number),
+    (0, class_validator_1.IsInt)(),
+    (0, class_validator_1.Min)(1),
+    __metadata("design:type", Number)
+], TransactionsQueryDto.prototype, "page", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Type)(() => Number),
+    (0, class_validator_1.IsInt)(),
+    (0, class_validator_1.Min)(1),
+    __metadata("design:type", Number)
+], TransactionsQueryDto.prototype, "limit", void 0);

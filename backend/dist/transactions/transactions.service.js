@@ -21,13 +21,16 @@ let TransactionsService = class TransactionsService {
     constructor(prisma) {
         this.prisma = prisma;
     }
-    async findMany(params) {
+    async findMany(params, mode) {
         const { page, limit, skip } = (0, pagination_1.normalizePagination)(params.page, params.limit);
         const where = {};
         if (params.type)
             where.type = params.type;
         if (params.itemTypeId)
             where.itemTypeId = params.itemTypeId;
+        if (mode) {
+            where.itemType = { itemtype: mode };
+        }
         if (params.startDate || params.endDate) {
             where.createdAt = {};
             if (params.startDate)
@@ -55,9 +58,13 @@ let TransactionsService = class TransactionsService {
             pagination: (0, pagination_1.buildPagination)(page, limit, total),
         };
     }
-    async findOne(id) {
-        const transaction = await this.prisma.transaction.findUnique({
-            where: { id },
+    async findOne(id, mode) {
+        const where = { id };
+        if (mode) {
+            where.itemType = { itemtype: mode };
+        }
+        const transaction = await this.prisma.transaction.findFirst({
+            where,
             include: {
                 itemType: true,
                 batch: true,
@@ -73,10 +80,13 @@ let TransactionsService = class TransactionsService {
         return this.prisma.$transaction(async (tx) => {
             const transaction = await tx.transaction.findUnique({
                 where: { id },
-                include: { batch: true },
+                include: { batch: true, itemType: true },
             });
             if (!transaction)
                 throw (0, errors_1.notFoundError)("Transaction not found");
+            if (mode && transaction.itemType?.itemtype && transaction.itemType.itemtype !== mode) {
+                throw (0, errors_1.forbiddenError)("Transaction belongs to another mode");
+            }
             if (transaction.status !== "POSTED") {
                 throw (0, errors_1.forbiddenError)("Only posted transactions can be edited");
             }

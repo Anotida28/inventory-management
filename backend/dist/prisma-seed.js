@@ -5,25 +5,33 @@ const client_1 = require("@prisma/client");
 const prisma = new client_1.PrismaClient();
 async function main() {
     console.log("Seeding database...");
-    // Create admin user
-    const admin = await prisma.user.upsert({
-        where: { email: "admin@omari.internal" },
-        update: {},
-        create: {
-            name: "System Administrator",
-            email: "admin@omari.internal",
-            role: "ADMIN",
-            isActive: true,
+    const seededUsers = [
+        {
+            username: "finance",
+            password: "finance",
         },
-    });
-    console.log(`Admin user created with id: ${admin.id}`);
+        {
+            username: "sales",
+            password: "sales",
+        },
+    ];
+    for (const user of seededUsers) {
+        const created = await prisma.user.upsert({
+            where: { username: user.username },
+            update: {
+                password: user.password,
+            },
+            create: {
+                username: user.username,
+                password: user.password,
+            },
+        });
+        console.log(`Seeded user created/updated: ${created.username}`);
+    }
     // Create item types
     const itemTypes = [
-        { name: "Visa Classic", code: "VISA-STD", isActive: true },
-        { name: "Visa Premium", code: "VISA-PRM", isActive: true },
-        { name: "Mastercard Business", code: "MC-BIZ", isActive: false },
-        { name: "Office Desk", code: "DESK-OFC", isActive: true },
-        { name: "Ergonomic Chair", code: "CHAIR-ERG", isActive: true },
+        { name: "OMARI-VISA", code: "OMARI-VISA", isActive: true },
+        { name: "OMARI-ZIMSWITCH", code: "OMARI-ZIMSWITCH", isActive: true },
     ];
     for (const item of itemTypes) {
         try {

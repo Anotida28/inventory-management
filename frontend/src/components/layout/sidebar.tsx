@@ -13,13 +13,11 @@ import { cn } from "lib/utils";
 import { Tabs, TabsList, TabsTrigger } from "components/ui/tabs";
 import { useSystemCopy, useSystemMode, type SystemMode } from "lib/system-mode";
 
-type UserRole = "ADMIN" | "CLERK" | "AUDITOR" | "DASHBOARD";
-
 type NavItem = {
   name: string;
   href: string;
   icon: ComponentType<{ className?: string }>;
-  roles?: UserRole[];
+  
 };
 
 export function Sidebar() {
@@ -29,34 +27,12 @@ export function Sidebar() {
 
   const navigation: NavItem[] = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-    {
-      name: copy.receiveNavLabel,
-      href: "/inventory/receive",
-      icon: Package,
-      roles: ["ADMIN", "CLERK", "AUDITOR", "DASHBOARD"],
-    },
-    {
-      name: copy.issueNavLabel,
-      href: "/inventory/issue",
-      icon: PackageCheck,
-      roles: ["ADMIN", "CLERK", "AUDITOR", "DASHBOARD"],
-    },
-    {
-      name: "Transactions",
-      href: "/transactions",
-      icon: FileText,
-      roles: ["ADMIN", "CLERK", "AUDITOR", "DASHBOARD"],
-    },
-    {
-      name: "Reports",
-      href: "/reports",
-      icon: BarChart3,
-      roles: ["ADMIN", "CLERK", "AUDITOR", "DASHBOARD"],
-    },
-    // Adjustments nav item fully removed
+    { name: copy.receiveNavLabel, href: "/inventory/receive", icon: Package },
+    { name: copy.issueNavLabel, href: "/inventory/issue", icon: PackageCheck },
+    { name: "Transactions", href: "/transactions", icon: FileText },
+    { name: "Reports", href: "/reports", icon: BarChart3 },
   ];
   
-  // All users can access all navigation items
   const filteredNavigation = navigation;
 
   return (

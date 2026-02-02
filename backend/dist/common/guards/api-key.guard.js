@@ -21,7 +21,6 @@ let ApiKeyGuard = class ApiKeyGuard {
         if (!requiredKey) {
             throw new common_1.UnauthorizedException("API key is not configured");
         }
-        ////asasas
         const request = context.switchToHttp().getRequest();
         const headerValue = request.headers?.["x-api-key"] ||
             request.headers?.authorization ||

@@ -1,9 +1,10 @@
+import { basename } from "path";
+
 export const toTransactionShape = (transaction: any) => {
   const createdBy = transaction.createdBy
     ? {
         id: transaction.createdBy.id,
-        name: transaction.createdBy.name,
-        email: transaction.createdBy.email,
+        username: transaction.createdBy.username,
       }
     : null;
 
@@ -34,7 +35,7 @@ export const toTransactionShape = (transaction: any) => {
     notes: transaction.notes,
     attachments: (transaction.attachments || []).map((file: any) => ({
       fileName: file.fileName,
-      fileUrl: file.path,
+      fileUrl: `/api/uploads/${basename(file.path)}`,
       mimeType: file.mimeType,
       size: file.size,
       uploadedAt: file.uploadedAt,

@@ -8,6 +8,8 @@ import {
   Req,
   UseInterceptors,
   UploadedFiles,
+  UnauthorizedException,
+  UseGuards,
 } from "@nestjs/common";
 import { FileFieldsInterceptor } from "@nestjs/platform-express";
 import { InventoryService } from "./inventory.service";
@@ -16,6 +18,7 @@ import { IssueInventoryDto } from "./dto/issue-inventory.dto";
 import { buildDiskStorage } from "../uploads/storage/disk.storage";
 import { getModeFromRequest } from "../common/utils/mode";
 import { validationError } from "../common/utils/errors";
+import { UsernameGuard } from "../common/guards/username.guard";
 
 const UPLOAD_FIELDS = [{ name: "files", maxCount: 10 }];
 const STORAGE_DIR = process.env.UPLOAD_DIR || "uploads";
@@ -58,6 +61,7 @@ const inventoryUploadInterceptor = FileFieldsInterceptor(UPLOAD_FIELDS, {
 });
 
 @Controller("inventory")
+@UseGuards(UsernameGuard)
 export class InventoryController {
   constructor(
     private readonly inventoryService: InventoryService,
@@ -67,12 +71,14 @@ export class InventoryController {
   async getBatches(
     @Query("itemTypeId") itemTypeId?: string,
     @Query("itemtype") itemtype?: string, // Add itemtype filter
+    @Req() req?: any,
   ) {
     const id = Number(itemTypeId);
     if (!Number.isFinite(id)) {
       return { batches: [] };
     }
-    const batches = await this.inventoryService.getBatches(id, itemtype);
+    const resolvedItemtype = itemtype || getModeFromRequest(req);
+    const batches = await this.inventoryService.getBatches(id, resolvedItemtype);
     return { batches };
   }
 
@@ -87,13 +93,18 @@ export class InventoryController {
       throw validationError("itemTypeId is required", { itemTypeId: "Required" });
     }
     
+    const userId = req?.user?.id;
+    if (!userId) {
+      throw new UnauthorizedException("Missing user");
+    }
+
     // Get itemtype from request body or default to INVENTORY
     const itemtype = dto.itemtype || getModeFromRequest(req) || "INVENTORY";
     
     const result = await this.inventoryService.receive(
       dto,
       files?.files || [],
-      1, // userId - you should get this from auth
+      userId,
       itemtype, // Pass itemtype parameter
     );
     return result;
@@ -106,13 +117,18 @@ export class InventoryController {
     @UploadedFiles() files: { files?: Express.Multer.File[] },
     @Req() req: any,
   ) {
+    const userId = req?.user?.id;
+    if (!userId) {
+      throw new UnauthorizedException("Missing user");
+    }
+
     // Get itemtype from request body or default to INVENTORY
     const itemtype = dto.itemtype || getModeFromRequest(req) || "INVENTORY";
     
     const result = await this.inventoryService.issue(
       dto,
       files?.files || [],
-      1, // userId - you should get this from auth
+      userId,
       itemtype, // Changed from mode to itemtype
     );
     return result;

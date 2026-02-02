@@ -16,10 +16,10 @@ async function testConnection() {
     console.log(`✅ Item types in database: ${itemTypes.length}`);
     
     // Test a simple query
-    const admin = await prisma.user.findFirst({
-      where: { email: "admin@omari.internal" }
+    const finance = await prisma.user.findFirst({
+      where: { username: "finance" }
     });
-    console.log(`✅ Admin user found: ${admin?.name}`);
+    console.log(`✅ Finance user found: ${finance?.username}`);
     
     console.log("\n🎉 Database connection successful!");
   } catch (error) {

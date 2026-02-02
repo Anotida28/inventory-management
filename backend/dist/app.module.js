@@ -14,10 +14,12 @@ const common_1 = require("@nestjs/common");
 const config_1 = require("@nestjs/config");
 const configuration_1 = __importDefault(require("./config/configuration"));
 const prisma_module_1 = require("./common/utils/prisma.module");
+const auth_module_1 = require("./auth/auth.module");
 const item_types_module_1 = require("./item-types/item-types.module");
 const transactions_module_1 = require("./transactions/transactions.module");
 const inventory_module_1 = require("./inventory/inventory.module");
 const reports_module_1 = require("./reports/reports.module");
+const uploads_module_1 = require("./uploads/uploads.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -29,10 +31,12 @@ exports.AppModule = AppModule = __decorate([
                 load: [configuration_1.default],
             }),
             prisma_module_1.PrismaModule,
+            auth_module_1.AuthModule,
             item_types_module_1.ItemTypesModule,
             transactions_module_1.TransactionsModule,
             inventory_module_1.InventoryModule,
             reports_module_1.ReportsModule,
+            uploads_module_1.UploadsModule,
         ],
     })
 ], AppModule);

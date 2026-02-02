@@ -115,7 +115,16 @@ export default function ReportsPage() {
 
   const { data: stockBalance } = useQuery({
     queryKey: qk.stockBalance(mode, stockBalanceFilters),
-    queryFn: () => apiRequest<any>("/api/reports/stock-balance"),
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (dateRange.startDate) params.append("startDate", dateRange.startDate);
+      if (dateRange.endDate) params.append("endDate", dateRange.endDate);
+      if (itemTypeFilter) params.append("itemTypeId", itemTypeFilter);
+      const query = params.toString();
+      return apiRequest<any>(
+        query ? `/api/reports/stock-balance?${query}` : "/api/reports/stock-balance",
+      );
+    },
   });
 
   const { data: issuesReport } = useQuery({
@@ -218,7 +227,6 @@ export default function ReportsPage() {
         const user = group.user || {};
         const haystack = [
           getUserDisplayName(user, ""),
-          user.email,
         ]
           .filter(Boolean)
           .join(" ")
@@ -865,8 +873,7 @@ export default function ReportsPage() {
                       <div
                         key={
                           userGroup.user?.id ??
-                          userGroup.user?.email ??
-                          userGroup.user?.name ??
+                          userGroup.user?.username ??
                           index
                         }
                         className="rounded-lg border border-border p-4"
@@ -876,11 +883,6 @@ export default function ReportsPage() {
                             <p className="font-semibold">
                               {getUserDisplayName(userGroup.user)}
                             </p>
-                            {userGroup.user?.email && (
-                              <p className="text-sm text-muted-foreground">
-                                {userGroup.user.email}
-                              </p>
-                            )}
                           </div>
                           <div className="text-right">
                             <p className="text-sm text-muted-foreground">

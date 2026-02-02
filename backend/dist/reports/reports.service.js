@@ -32,10 +32,13 @@ let ReportsService = class ReportsService {
     constructor(prisma) {
         this.prisma = prisma;
     }
-    buildWhere(filters) {
+    buildWhere(filters, mode) {
         const where = {};
         if (filters.itemTypeId)
             where.itemTypeId = filters.itemTypeId;
+        if (mode) {
+            where.itemType = { itemtype: mode };
+        }
         if (filters.startDate || filters.endDate) {
             where.createdAt = {};
             if (filters.startDate)
@@ -45,8 +48,8 @@ let ReportsService = class ReportsService {
         }
         return where;
     }
-    async fetchTransactions(filters) {
-        const where = this.buildWhere(filters);
+    async fetchTransactions(filters, mode) {
+        const where = this.buildWhere(filters, mode);
         return this.prisma.transaction.findMany({
             where,
             include: {
@@ -60,8 +63,11 @@ let ReportsService = class ReportsService {
     }
     async getDashboard(filters, mode) {
         const isInventory = mode === "INVENTORY";
-        const itemTypes = await this.prisma.itemType.findMany({ orderBy: { name: "asc" } });
-        const transactions = await this.fetchTransactions(filters);
+        const itemTypes = await this.prisma.itemType.findMany({
+            where: { itemtype: mode },
+            orderBy: { name: "asc" },
+        });
+        const transactions = await this.fetchTransactions(filters, mode);
         const byItemType = itemTypes
             .filter((itemType) => !filters.itemTypeId || itemType.id === filters.itemTypeId)
             .map((itemType) => {
@@ -195,10 +201,13 @@ let ReportsService = class ReportsService {
             recent: { receipts, issues },
         };
     }
-    async getStockBalance(filters) {
+    async getStockBalance(filters, mode) {
         const [itemTypes, transactions] = await Promise.all([
-            this.prisma.itemType.findMany({ orderBy: { name: "asc" } }),
-            this.fetchTransactions(filters),
+            this.prisma.itemType.findMany({
+                where: mode ? { itemtype: mode } : undefined,
+                orderBy: { name: "asc" },
+            }),
+            this.fetchTransactions(filters, mode),
         ]);
         const byItemType = itemTypes.map((itemType) => {
             const itemTransactions = transactions.filter((txn) => txn.itemTypeId === itemType.id);
@@ -228,8 +237,8 @@ let ReportsService = class ReportsService {
             byItemType,
         };
     }
-    async getIssues(filters) {
-        const transactions = await this.fetchTransactions(filters);
+    async getIssues(filters, mode) {
+        const transactions = await this.fetchTransactions(filters, mode);
         const issues = transactions.filter((txn) => txn.type === "ISSUE");
         const byItemType = new Map();
         issues.forEach((txn) => {
@@ -261,8 +270,8 @@ let ReportsService = class ReportsService {
             issues: issues.map((txn) => (0, transaction_shape_1.toTransactionShape)(txn)),
         };
     }
-    async getReceipts(filters) {
-        const transactions = await this.fetchTransactions(filters);
+    async getReceipts(filters, mode) {
+        const transactions = await this.fetchTransactions(filters, mode);
         const receipts = transactions.filter((txn) => txn.type === "RECEIVE");
         const byItemType = new Map();
         receipts.forEach((txn) => {
@@ -298,8 +307,8 @@ let ReportsService = class ReportsService {
             receipts: receipts.map((txn) => (0, transaction_shape_1.toTransactionShape)(txn)),
         };
     }
-    async getUserActivity(filters) {
-        const transactions = await this.fetchTransactions(filters);
+    async getUserActivity(filters, mode) {
+        const transactions = await this.fetchTransactions(filters, mode);
         const byUser = new Map();
         transactions.forEach((txn) => {
             const user = txn.createdBy;
@@ -309,8 +318,7 @@ let ReportsService = class ReportsService {
                 byUser.set(user.id, {
                     user: {
                         id: user.id,
-                        name: user.name,
-                        email: user.email,
+                        username: user.username,
                     },
                     receipts: 0,
                     issues: 0,

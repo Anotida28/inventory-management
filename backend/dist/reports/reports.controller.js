@@ -17,6 +17,7 @@ const common_1 = require("@nestjs/common");
 const reports_service_1 = require("./reports.service");
 const report_filters_dto_1 = require("./dto/report-filters.dto");
 const mode_1 = require("../common/utils/mode");
+const username_guard_1 = require("../common/guards/username.guard");
 let ReportsController = class ReportsController {
     constructor(reportsService) {
         this.reportsService = reportsService;
@@ -25,17 +26,21 @@ let ReportsController = class ReportsController {
         const mode = (0, mode_1.getModeFromRequest)(req);
         return this.reportsService.getDashboard(filters, mode);
     }
-    async getStockBalance(filters) {
-        return this.reportsService.getStockBalance(filters);
+    async getStockBalance(filters, req) {
+        const mode = (0, mode_1.getModeFromRequest)(req);
+        return this.reportsService.getStockBalance(filters, mode);
     }
-    async getIssues(filters) {
-        return this.reportsService.getIssues(filters);
+    async getIssues(filters, req) {
+        const mode = (0, mode_1.getModeFromRequest)(req);
+        return this.reportsService.getIssues(filters, mode);
     }
-    async getReceipts(filters) {
-        return this.reportsService.getReceipts(filters);
+    async getReceipts(filters, req) {
+        const mode = (0, mode_1.getModeFromRequest)(req);
+        return this.reportsService.getReceipts(filters, mode);
     }
-    async getUserActivity(filters) {
-        return this.reportsService.getUserActivity(filters);
+    async getUserActivity(filters, req) {
+        const mode = (0, mode_1.getModeFromRequest)(req);
+        return this.reportsService.getUserActivity(filters, mode);
     }
 };
 exports.ReportsController = ReportsController;
@@ -50,32 +55,37 @@ __decorate([
 __decorate([
     (0, common_1.Get)("stock-balance"),
     __param(0, (0, common_1.Query)()),
+    __param(1, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [report_filters_dto_1.ReportFiltersDto]),
+    __metadata("design:paramtypes", [report_filters_dto_1.ReportFiltersDto, Object]),
     __metadata("design:returntype", Promise)
 ], ReportsController.prototype, "getStockBalance", null);
 __decorate([
     (0, common_1.Get)("issues"),
     __param(0, (0, common_1.Query)()),
+    __param(1, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [report_filters_dto_1.ReportFiltersDto]),
+    __metadata("design:paramtypes", [report_filters_dto_1.ReportFiltersDto, Object]),
     __metadata("design:returntype", Promise)
 ], ReportsController.prototype, "getIssues", null);
 __decorate([
     (0, common_1.Get)("receipts"),
     __param(0, (0, common_1.Query)()),
+    __param(1, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [report_filters_dto_1.ReportFiltersDto]),
+    __metadata("design:paramtypes", [report_filters_dto_1.ReportFiltersDto, Object]),
     __metadata("design:returntype", Promise)
 ], ReportsController.prototype, "getReceipts", null);
 __decorate([
     (0, common_1.Get)("user-activity"),
     __param(0, (0, common_1.Query)()),
+    __param(1, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [report_filters_dto_1.ReportFiltersDto]),
+    __metadata("design:paramtypes", [report_filters_dto_1.ReportFiltersDto, Object]),
     __metadata("design:returntype", Promise)
 ], ReportsController.prototype, "getUserActivity", null);
 exports.ReportsController = ReportsController = __decorate([
     (0, common_1.Controller)("reports"),
+    (0, common_1.UseGuards)(username_guard_1.UsernameGuard),
     __metadata("design:paramtypes", [reports_service_1.ReportsService])
 ], ReportsController);

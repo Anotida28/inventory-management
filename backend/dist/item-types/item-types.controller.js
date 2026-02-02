@@ -16,34 +16,41 @@ exports.ItemTypesController = void 0;
 const common_1 = require("@nestjs/common");
 const item_types_service_1 = require("./item-types.service");
 const create_item_type_dto_1 = require("./dto/create-item-type.dto");
+const username_guard_1 = require("../common/guards/username.guard");
+const mode_1 = require("../common/utils/mode");
 let ItemTypesController = class ItemTypesController {
     constructor(itemTypesService) {
         this.itemTypesService = itemTypesService;
     }
-    async getItemTypes(includeInactive) {
-        const itemTypes = await this.itemTypesService.findAll(includeInactive === "true");
+    async getItemTypes(req, includeInactive) {
+        const mode = (0, mode_1.getModeFromRequest)(req);
+        const itemTypes = await this.itemTypesService.findAll(includeInactive === "true", mode);
         return { itemTypes };
     }
-    async createItemType(dto) {
-        return this.itemTypesService.create(dto);
+    async createItemType(dto, req) {
+        const mode = (0, mode_1.getModeFromRequest)(req);
+        return this.itemTypesService.create(dto, mode);
     }
 };
 exports.ItemTypesController = ItemTypesController;
 __decorate([
     (0, common_1.Get)(),
-    __param(0, (0, common_1.Query)("includeInactive")),
+    __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Query)("includeInactive")),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
+    __metadata("design:paramtypes", [Object, String]),
     __metadata("design:returntype", Promise)
 ], ItemTypesController.prototype, "getItemTypes", null);
 __decorate([
     (0, common_1.Post)(),
     __param(0, (0, common_1.Body)()),
+    __param(1, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [create_item_type_dto_1.CreateItemTypeDto]),
+    __metadata("design:paramtypes", [create_item_type_dto_1.CreateItemTypeDto, Object]),
     __metadata("design:returntype", Promise)
 ], ItemTypesController.prototype, "createItemType", null);
 exports.ItemTypesController = ItemTypesController = __decorate([
     (0, common_1.Controller)("item-types"),
+    (0, common_1.UseGuards)(username_guard_1.UsernameGuard),
     __metadata("design:paramtypes", [item_types_service_1.ItemTypesService])
 ], ItemTypesController);

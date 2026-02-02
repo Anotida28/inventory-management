@@ -1,9 +1,11 @@
-import { Controller, Get, Query, Req } from "@nestjs/common";
+import { Controller, Get, Query, Req, UseGuards } from "@nestjs/common";
 import { ReportsService } from "./reports.service";
 import { ReportFiltersDto } from "./dto/report-filters.dto";
 import { getModeFromRequest } from "../common/utils/mode";
+import { UsernameGuard } from "../common/guards/username.guard";
 
 @Controller("reports")
+@UseGuards(UsernameGuard)
 export class ReportsController {
   constructor(private readonly reportsService: ReportsService) {}
 
@@ -14,22 +16,26 @@ export class ReportsController {
   }
 
   @Get("stock-balance")
-  async getStockBalance(@Query() filters: ReportFiltersDto) {
-    return this.reportsService.getStockBalance(filters);
+  async getStockBalance(@Query() filters: ReportFiltersDto, @Req() req: any) {
+    const mode = getModeFromRequest(req);
+    return this.reportsService.getStockBalance(filters, mode);
   }
 
   @Get("issues")
-  async getIssues(@Query() filters: ReportFiltersDto) {
-    return this.reportsService.getIssues(filters);
+  async getIssues(@Query() filters: ReportFiltersDto, @Req() req: any) {
+    const mode = getModeFromRequest(req);
+    return this.reportsService.getIssues(filters, mode);
   }
 
   @Get("receipts")
-  async getReceipts(@Query() filters: ReportFiltersDto) {
-    return this.reportsService.getReceipts(filters);
+  async getReceipts(@Query() filters: ReportFiltersDto, @Req() req: any) {
+    const mode = getModeFromRequest(req);
+    return this.reportsService.getReceipts(filters, mode);
   }
 
   @Get("user-activity")
-  async getUserActivity(@Query() filters: ReportFiltersDto) {
-    return this.reportsService.getUserActivity(filters);
+  async getUserActivity(@Query() filters: ReportFiltersDto, @Req() req: any) {
+    const mode = getModeFromRequest(req);
+    return this.reportsService.getUserActivity(filters, mode);
   }
 }

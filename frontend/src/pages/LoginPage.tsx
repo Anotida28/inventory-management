@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, FormEvent } from "react";
+import { useUser } from "lib/user-context";
+import { apiRequest } from "services/api";
 import { useNavigate } from "react-router-dom";
-import { getSeededUser } from "lib/admin-context";
 import { Button } from "components/ui/button";
 import { Input } from "components/ui/input";
 import { Label } from "components/ui/label";
@@ -18,6 +19,8 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const { setUser } = useUser();
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError("");
@@ -26,19 +29,22 @@ export default function LoginPage() {
     try {
       if (!username || !password) {
         setError("Please enter a username and password.");
+        setLoading(false);
         return;
       }
 
-      const user = getSeededUser(username, password);
-      if (!user) {
-        setError("Invalid username or password.");
-        return;
-      }
+      const response = await apiRequest<{ id: number | string; username: string }>(
+        "/api/auth/login",
+        {
+          method: "POST",
+          body: JSON.stringify({ username, password }),
+        },
+      );
 
-      // Optionally store user info in localStorage/sessionStorage if needed
-      navigate("/transactions");
-    } catch (err) {
-      setError("An error occurred. Please try again.");
+      setUser(response);
+      navigate("/dashboard");
+    } catch (err: any) {
+      setError(err?.message || "An error occurred. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -59,8 +65,8 @@ export default function LoginPage() {
           <img
             src="/images/20251022_100241_OMARI_LOGO_WITH_AFFILLIATE_STATEMENT_GRADIENT_GREEN_HORIZONTAL_VECTOR_05_page-0001.jpg.png"
             alt="Omari Logo"
-            width={320}
-            height={90}
+            width={325}
+            height={95}
             className="mb-4"
           />
         </div>

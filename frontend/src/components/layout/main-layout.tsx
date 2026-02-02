@@ -1,11 +1,9 @@
 "use client";
 
 import { Sidebar } from "./sidebar";
-import { Header } from "./header";
+import Header from "./header";
 
 export function MainLayout({ children }: { children: React.ReactNode }) {
-  // No authentication - direct access for internal system
-  
   return (
     <div className="relative min-h-screen bg-background">
       <div

@@ -42,12 +42,7 @@ interface TransactionWithRelations {
   } | null;
   createdBy: {
     id: number;
-    name: string;
-    email: string | null;
-    role: string;
-    isActive: boolean;
-    createdAt: Date;
-    updatedAt: Date;
+    username: string;
   };
   attachments: Array<{
     id: number;
@@ -75,9 +70,12 @@ const sumRevenue = (txn: TransactionWithRelations) => {
 export class ReportsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  private buildWhere(filters: ReportFiltersDto) {
+  private buildWhere(filters: ReportFiltersDto, mode?: SystemMode) {
     const where: any = {};
     if (filters.itemTypeId) where.itemTypeId = filters.itemTypeId;
+    if (mode) {
+      where.itemType = { itemtype: mode };
+    }
     if (filters.startDate || filters.endDate) {
       where.createdAt = {};
       if (filters.startDate) where.createdAt.gte = new Date(filters.startDate);
@@ -86,8 +84,11 @@ export class ReportsService {
     return where;
   }
 
-  private async fetchTransactions(filters: ReportFiltersDto): Promise<TransactionWithRelations[]> {
-    const where = this.buildWhere(filters);
+  private async fetchTransactions(
+    filters: ReportFiltersDto,
+    mode?: SystemMode,
+  ): Promise<TransactionWithRelations[]> {
+    const where = this.buildWhere(filters, mode);
     return this.prisma.transaction.findMany({
       where,
       include: {
@@ -103,8 +104,11 @@ export class ReportsService {
   async getDashboard(filters: ReportFiltersDto, mode: SystemMode) {
     const isInventory = mode === "INVENTORY";
     
-    const itemTypes = await this.prisma.itemType.findMany({ orderBy: { name: "asc" } });
-    const transactions = await this.fetchTransactions(filters);
+    const itemTypes = await this.prisma.itemType.findMany({
+      where: { itemtype: mode },
+      orderBy: { name: "asc" },
+    });
+    const transactions = await this.fetchTransactions(filters, mode);
 
     const byItemType = itemTypes
       .filter((itemType: any) => !filters.itemTypeId || itemType.id === filters.itemTypeId)
@@ -254,10 +258,13 @@ export class ReportsService {
     };
   }
 
-  async getStockBalance(filters: ReportFiltersDto) {
+  async getStockBalance(filters: ReportFiltersDto, mode?: SystemMode) {
     const [itemTypes, transactions] = await Promise.all([
-      this.prisma.itemType.findMany({ orderBy: { name: "asc" } }),
-      this.fetchTransactions(filters),
+      this.prisma.itemType.findMany({
+        where: mode ? { itemtype: mode } : undefined,
+        orderBy: { name: "asc" },
+      }),
+      this.fetchTransactions(filters, mode),
     ]);
 
     const byItemType = itemTypes.map((itemType: any) => {
@@ -291,8 +298,8 @@ export class ReportsService {
     };
   }
 
-  async getIssues(filters: ReportFiltersDto) {
-    const transactions = await this.fetchTransactions(filters);
+  async getIssues(filters: ReportFiltersDto, mode?: SystemMode) {
+    const transactions = await this.fetchTransactions(filters, mode);
     const issues = transactions.filter((txn: TransactionWithRelations) => txn.type === "ISSUE");
 
     const byItemType = new Map<number, { itemType: any; totalQty: number; totalCount: number }>();
@@ -328,8 +335,8 @@ export class ReportsService {
     };
   }
 
-  async getReceipts(filters: ReportFiltersDto) {
-    const transactions = await this.fetchTransactions(filters);
+  async getReceipts(filters: ReportFiltersDto, mode?: SystemMode) {
+    const transactions = await this.fetchTransactions(filters, mode);
     const receipts = transactions.filter((txn: TransactionWithRelations) => txn.type === "RECEIVE");
 
     const byItemType = new Map<number, { itemType: any; totalQty: number; totalCount: number; totalReceivedCost: number }>();
@@ -369,8 +376,8 @@ export class ReportsService {
     };
   }
 
-  async getUserActivity(filters: ReportFiltersDto) {
-    const transactions = await this.fetchTransactions(filters);
+  async getUserActivity(filters: ReportFiltersDto, mode?: SystemMode) {
+    const transactions = await this.fetchTransactions(filters, mode);
 
     const byUser = new Map<number, any>();
 
@@ -381,8 +388,7 @@ export class ReportsService {
         byUser.set(user.id, {
           user: {
             id: user.id,
-            name: user.name,
-            email: user.email,
+            username: user.username,
           },
           receipts: 0,
           issues: 0,

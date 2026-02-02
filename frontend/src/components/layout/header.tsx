@@ -1,6 +1,7 @@
 "use client";
 
 import { useNavigate } from "react-router-dom";
+import { useUser } from "lib/user-context";
 import { ThemeToggle } from "components/theme-toggle";
 import { Button } from "components/ui/button";
 import {
@@ -12,15 +13,15 @@ import {
   DropdownMenuTrigger,
 } from "components/ui/dropdown-menu";
 import { User, LogOut } from "lucide-react";
-import { getAdminUser } from "lib/admin-context";
 import { useSystemCopy } from "lib/system-mode";
 
-export function Header() {
+export default function Header() {
   const navigate = useNavigate();
-  const admin = getAdminUser();
+  const { user, logout } = useUser();
   const copy = useSystemCopy();
 
   const handleLogout = () => {
+    logout();
     navigate("/login");
   };
 
@@ -34,9 +35,8 @@ export function Header() {
       <div className="flex items-center gap-4">
         <div className="hidden text-right sm:block">
           <p className="text-sm font-medium text-foreground">
-            {admin.firstName} {admin.lastName}
+            {user?.username || ""}
           </p>
-          <p className="text-xs text-muted-foreground">{admin.role}</p>
         </div>
         <ThemeToggle />
         <DropdownMenu>
@@ -53,13 +53,7 @@ export function Header() {
             <DropdownMenuLabel>
               <div className="flex flex-col space-y-1">
                 <p className="text-sm font-medium">
-                  {admin.firstName} {admin.lastName}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {admin.email}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Role: {admin.role}
+                  {user?.username || ""}
                 </p>
               </div>
             </DropdownMenuLabel>

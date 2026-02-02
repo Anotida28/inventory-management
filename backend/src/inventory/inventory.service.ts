@@ -75,17 +75,22 @@ async receive(
 ) {
   console.log(`Processing receive in ${itemtype} mode`);
   
-  // First, update the ItemType's itemtype field
-  await this.prisma.itemType.update({
-    where: { id: dto.itemTypeId },
-    data: { itemtype },
-  });
-
   const itemType = await this.prisma.itemType.findUnique({
     where: { id: dto.itemTypeId },
   });
 
   if (!itemType) throw notFoundError("Item type not found");
+  if (itemType.itemtype && itemType.itemtype !== itemtype) {
+    throw validationError("Item type belongs to another mode", {
+      itemtype: `Expected ${itemType.itemtype}`,
+    });
+  }
+  if (!itemType.itemtype) {
+    await this.prisma.itemType.update({
+      where: { id: dto.itemTypeId },
+      data: { itemtype },
+    });
+  }
 
   const batchCode = dto.batchCode?.trim() || `BATCH-${Date.now()}`;
   const receivedAt = dto.receivedAt ? new Date(dto.receivedAt) : new Date();
@@ -175,15 +180,86 @@ async issue(
   
   if (!itemType) throw notFoundError("Item type not found");
   
-  // Update itemtype on ItemType if needed
-  if (itemType.itemtype !== itemtype) {
+  if (itemType.itemtype && itemType.itemtype !== itemtype) {
+    throw validationError("Item type belongs to another mode", {
+      itemtype: `Expected ${itemType.itemtype}`,
+    });
+  }
+  if (!itemType.itemtype) {
     await this.prisma.itemType.update({
       where: { id: dto.itemTypeId },
       data: { itemtype },
     });
   }
 
-  // Rest of your issue method remains the same
-  // but remove itemtype from transaction creation
+  const batch = await this.prisma.batch.findUnique({
+    where: { id: dto.batchId },
+  });
+
+  if (!batch || batch.itemTypeId !== dto.itemTypeId) {
+    throw notFoundError("Batch not found for item type");
+  }
+
+  const availableQty = Math.max(batch.qtyReceived - batch.qtyIssued, 0);
+  if (!Number.isFinite(dto.qty) || dto.qty <= 0) {
+    throw validationError("qty must be > 0", { qty: "Must be > 0" });
+  }
+  if (dto.qty > availableQty) {
+    throw validationError("Insufficient batch inventory", {
+      qty: "Exceeds available inventory",
+    });
+  }
+
+  const issuedAt = new Date();
+
+  const result = await this.prisma.$transaction(async (tx) => {
+    const updatedBatch = await tx.batch.update({
+      where: { id: batch.id },
+      data: { qtyIssued: batch.qtyIssued + dto.qty },
+    });
+
+    const transaction = await tx.transaction.create({
+      data: {
+        type: "ISSUE",
+        status: "POSTED",
+        itemTypeId: dto.itemTypeId,
+        batchId: batch.id,
+        qty: dto.qty,
+        unitPrice: null,
+        totalPrice: null,
+        issuedToType: dto.issuedToType,
+        issuedToName: dto.issuedToName?.trim() || null,
+        createdAt: issuedAt,
+        createdById: userId,
+        notes: dto.notes?.trim() || null,
+        attachments: {
+          create: files.map((file) => ({
+            fileName: file.originalname,
+            mimeType: file.mimetype,
+            size: file.size,
+            path: file.path,
+            uploadedById: userId,
+          })),
+        },
+      },
+      include: {
+        itemType: true,
+        batch: true,
+        createdBy: true,
+        attachments: true,
+      },
+    });
+
+    return { batch: updatedBatch, transaction };
+  });
+
+  return {
+    batch: {
+      id: result.batch.id,
+      batchCode: result.batch.batchCode,
+      itemTypeId: result.batch.itemTypeId,
+    },
+    transaction: toTransactionShape(result.transaction),
+  };
 }
 }
