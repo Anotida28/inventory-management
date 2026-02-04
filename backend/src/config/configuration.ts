@@ -36,5 +36,10 @@ export default () => {
     uploadAllowedMimeTypes: parseAllowedMimeTypes(
       process.env.UPLOAD_ALLOWED_MIME_TYPES,
     ),
+    ad: {
+      apiUrl: process.env.AD_API_URL || "http://ad-api-nlb-28086d8814fcbf74.elb.eu-west-1.amazonaws.com/activedirectory/authenticate/login",
+      username: process.env.AD_USERNAME || "adusername",
+      password: process.env.AD_PASSWORD || "adpassword",
+    },
   };
 };

@@ -10,14 +10,21 @@ export class AuthController {
   async login(@Body() dto: LoginDto) {
     const username = dto.username.trim();
     const password = dto.password;
-    const user = await this.authService.validateUser(username, password);
-    if (!user) {
+    const result = await this.authService.validateUser(username, password);
+    
+    if (!result) {
       throw new UnauthorizedException("Invalid username or password.");
     }
 
     return {
-      id: user.id,
-      username: user.username,
+      status: "success",
+      source: result.source,
+      user: {
+        id: result.id,
+        username: result.username,
+        role: result.role,
+      },
+      ...(result.adData && { data: result.adData }),
     };
   }
 }
