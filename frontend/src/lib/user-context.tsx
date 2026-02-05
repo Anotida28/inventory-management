@@ -1,8 +1,14 @@
 import React, { createContext, useContext, useState, ReactNode } from "react";
 
 export type User = {
-  id: number | string;
   username: string;
+  fullname?: string;
+  email?: string;
+  title?: string;
+  employeeID?: string;
+  businessUnit?: string;
+  mobile?: string;
+  source?: "local" | "localAdmin" | "ad";
 };
 
 type UserContextType = {

@@ -35,8 +35,11 @@ export default function Header() {
       <div className="flex items-center gap-4">
         <div className="hidden text-right sm:block">
           <p className="text-sm font-medium text-foreground">
-            {user?.username || ""}
+            {user?.fullname || user?.username || ""}
           </p>
+          {user?.title && (
+            <p className="text-xs text-muted-foreground">{user.title}</p>
+          )}
         </div>
         <ThemeToggle />
         <DropdownMenu>
@@ -53,8 +56,11 @@ export default function Header() {
             <DropdownMenuLabel>
               <div className="flex flex-col space-y-1">
                 <p className="text-sm font-medium">
-                  {user?.username || ""}
+                  {user?.fullname || user?.username || ""}
                 </p>
+                {user?.email && (
+                  <p className="text-xs text-muted-foreground">{user.email}</p>
+                )}
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />

@@ -33,15 +33,45 @@ export default function LoginPage() {
         return;
       }
 
-      const response = await apiRequest<{ id: number | string; username: string }>(
-        "/api/auth/login",
-        {
-          method: "POST",
-          body: JSON.stringify({ username, password }),
-        },
-      );
+      const response = await apiRequest<{
+        status: string;
+        source: "local" | "localAdmin" | "ad";
+        user?: { username: string; role?: string };
+        data?: {
+          fullname: string;
+          employeeID: string;
+          email: string;
+          title: string;
+          businessUnit: string;
+          mobile: string;
+        };
+      }>("/api/auth/login", {
+        method: "POST",
+        body: JSON.stringify({ username, password }),
+      });
 
-      setUser(response);
+      if (response.status !== "success") {
+        throw new Error("Login failed");
+      }
+
+      // Build user object based on source
+      const userData: import("lib/user-context").User = response.source === "ad"
+        ? {
+            username: response.data?.fullname || username,
+            fullname: response.data?.fullname,
+            email: response.data?.email,
+            title: response.data?.title,
+            employeeID: response.data?.employeeID,
+            businessUnit: response.data?.businessUnit,
+            mobile: response.data?.mobile,
+            source: response.source,
+          }
+        : {
+            username: response.user?.username || username,
+            source: response.source,
+          };
+
+      setUser(userData);
       navigate("/dashboard");
     } catch (err: any) {
       setError(err?.message || "An error occurred. Please try again.");
