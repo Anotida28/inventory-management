@@ -37,9 +37,6 @@ export default function Header() {
           <p className="text-sm font-medium text-foreground">
             {user?.fullname || user?.username || ""}
           </p>
-          {user?.title && (
-            <p className="text-xs text-muted-foreground">{user.title}</p>
-          )}
         </div>
         <ThemeToggle />
         <DropdownMenu>
